@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE JobConfiguration PUBLIC "" "JobConfig.dtd" [
+
+
+<!ENTITY OUTPUTdir "/nfs/dust/cms/user/flabe/TstarTstar/data/DNN/2016/">
+<!ENTITY INPUTdir  "/nfs/dust/cms/user/flabe/TstarTstar/data/Analysis/2016/">
+]>
+
+<!--
+<ConfigParse NEventsBreak="0" LastBreak="0" FileSplit="20" AutoResubmit="100"/>
+<ConfigSGE RAM="2" DISK="2" Mail="finn.labe@desy.de" Notification="as" Workdir="workdir_DNN_background_extrapolation_2016v3"/>
+-->
+
+<!-- OutputLevel controls which messages are printed; set to VERBOSE or DEBUG for more verbosity, to WARNING or ERROR for less -->
+<JobConfiguration JobName="ExampleCycleJob" OutputLevel="INFO">
+    <Library Name="libSUHH2TstarTstar"/>
+    <Package Name="SUHH2TstarTstar.par" />
+
+   <Cycle Name="uhh2::AnalysisModuleRunner" OutputDirectory="&OUTPUTdir;/" PostFix="" TargetLumi="35900" >
+   <!-- <Cycle Name="uhh2::AnalysisModuleRunner"  RunMode="PROOF" ProofServer="lite://"  ProofWorkDir="/nfs/dust/cms/user/ottjoc/proof-wd/" ProofNodes="2" OutputDirectory="./" PostFix="" TargetLumi="1" >  -->
+
+        <!-- Verion attribute must have year in it, same as used in ntuple config, e.g. 2018, 2016v3, etc -->
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleElectron2016_RunB_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleElectron2016_RunB_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleElectron2016_RunC_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleElectron2016_RunC_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleElectron2016_RunD_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleElectron2016_RunD_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleElectron2016_RunE_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleElectron2016_RunE_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleElectron2016_RunF_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleElectron2016_RunF_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleElectron2016_RunG_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleElectron2016_RunG_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleElectron2016_RunH_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleElectron2016_RunH_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<!-- ##### muon ##### -->
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleMuon2016_RunB_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleMuon2016_RunB_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleMuon2016_RunC_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleMuon2016_RunC_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleMuon2016_RunD_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleMuon2016_RunD_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleMuon2016_RunE_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleMuon2016_RunE_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleMuon2016_RunF_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleMuon2016_RunF_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleMuon2016_RunG_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleMuon2016_RunG_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+	<InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="DatadrivenBG_SingleMuon2016_RunH_2016v3" Cacheable="False">
+	 <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleMuon2016_RunH_2016v3.root" Lumi="0.0"/>
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+
+        <UserConfig>
+            <!-- define which collections to read from the input. Only specify what you need to save I/O time -->
+	    <Item Name="PrimaryVertexCollection" Value="offlineSlimmedPrimaryVertices"/>
+	    <Item Name="ElectronCollection"      Value="slimmedElectronsUSER"/>
+	    <Item Name="PhotonCollection"        Value="slimmedPhotonsUSER"/>
+	    <Item Name="MuonCollection"          Value="slimmedMuonsUSER"/>
+	    <Item Name="JetCollection"           Value="jetsAk4Puppi"/>
+	    <Item Name="TopJetCollection"        Value="hotvrPuppi"/>
+	    <Item Name="METName"                 Value="slimmedMETsPuppi"/>
+	    <Item Name="lumi_file" Value="common/data/2016/Cert_271036-284044_13TeV_23Sep2016ReReco_Collisions16_JSON.root"/>
+	    <Item Name="lumihists_lumi_per_bin" Value="500.0"/>
+
+      <Item Name="additionalBranches" Value="is_btagevent is_muevt evt_weight ST_weight DNN_Inputs neutrino TstarTstar_Hyp_gHOTVR TstarTstar_Hyp_gAK4 ST weight_sfmu_id weight_sfmu_id_down weight_sfmu_id_up weight_sfmu_isolation weight_sfmu_isolation_down weight_sfmu_isolation_up weight_sfelec_id weight_sfelec_id_down weight_sfelec_id_up TopTagSF TopTagSF_down TopTagSF_merged_down TopTagSF_merged_up TopTagSF_non_down TopTagSF_non_up TopTagSF_semi_up TopTagSF_semi_down TopTagSF_up" />
+
+<!--	    <Item Name="is_puppi" Value="&IS_PUPPI;"/> -->
+
+	    <Item Name="jersmear_direction" Value="nominal"/>
+	    <Item Name="jecsmear_direction" Value="nominal"/>
+
+
+            <!-- the class name of the AnalysisModule subclasses to run: -->
+            <Item Name="AnalysisModule" Value="TstarTstarDNNModule" />
+
+            <!-- tell AnalysisModuleRunner NOT to use the MC event weight from SFrame; rather let
+                 MCLumiWeight (called via CommonModules) calculate the MC event weight. The MC
+                 event weight assigned by MCLumiWeight is InputData.Lumi / Cycle.TargetLumi. -->
+            <Item Name="use_sframe_weight" Value="false" />
+
+            <!-- configuration for MCPileupReweight (run as part of CommonModules): -->
+            <Item Name="pileup_directory" Value="common/data/2016/MyMCPileupHistogram.root" />
+            <Item Name="pileup_directory_data" Value="common/data/2016/MyDataPileupHistogram.root" />
+
+            <!-- Some test configuration; see TstarTstarModule.cxx for how to access it: -->
+            <Item Name="use_data_for" Value="background_extrapolation" />
+
+        </UserConfig>
+    </Cycle>
+</JobConfiguration>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE JobConfiguration PUBLIC "" "JobConfig.dtd" [
+<!ENTITY TargetLumi      "59740">
+<!ENTITY b_Cacheable     "False">
+<!ENTITY NEVT            "-1">
+
+<!ENTITY INPUTdir           "/nfs/dust/cms/user/flabe/TstarTstar/data/Preselection/TriggerSF/">
+<!ENTITY OUTPUTdir           "/nfs/dust/cms/user/flabe/TstarTstar/data/Selection/TriggerSF/">
+
+]>
+
+<!--
+<ConfigParse NEventsBreak="0" LastBreak="0" FileSplit="35" AutoResubmit="100"/>
+<ConfigSGE RAM="2" DISK="2" Mail="finn.labe@desy.de" Notification="as" Workdir="workdir_Selection_Data_2018"/>
+-->
+
+<!-- OutputLevel controls which messages are printed; set to VERBOSE or DEBUG for more verbosity, to WARNING or ERROR for less -->
+<JobConfiguration JobName="ExampleCycleJob" OutputLevel="INFO">
+    <Library Name="libSUHH2TstarTstar"/>
+    <Package Name="SUHH2TstarTstar.par" />
+
+   <Cycle Name="uhh2::AnalysisModuleRunner" OutputDirectory="&OUTPUTdir;/" PostFix="" TargetLumi="&TargetLumi;" >
+   <!-- <Cycle Name="uhh2::AnalysisModuleRunner"  RunMode="PROOF" ProofServer="lite://"  ProofWorkDir="/nfs/dust/cms/user/ottjoc/proof-wd/" ProofNodes="2" OutputDirectory="./" PostFix="" TargetLumi="1" >  -->
+        <!-- Verion attribute must have year in it, same as used in ntuple config, e.g. 2018, 2016v3, etc -->
+
+        <InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="SingleMuon2018_RunD_2018" Cacheable="False">
+          <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.DATA.SingleMuon2018_RunD_2018.root" Lumi="0.0"/>
+                <InputTree Name="AnalysisTree" />
+                <OutputTree Name="AnalysisTree" />
+              </InputData>
+
+              <InputData Lumi="1" NEventsMax="-1" Type="MC" Version="TTToDiLeptonic_2018" Cacheable="False">
+                <In FileName="&INPUTdir;/uhh2.AnalysisModuleRunner.MC.TTToDiLeptonic_2018.root" Lumi="0.0"/>
+                      <InputTree Name="AnalysisTree" />
+                      <OutputTree Name="AnalysisTree" />
+                    </InputData>
+
+
+        <UserConfig>
+            <!-- define which collections to read from the input. Only specify what you need to save I/O time -->
+            <Item Name="PrimaryVertexCollection" Value="offlineSlimmedPrimaryVertices"/>
+            <Item Name="GenParticleCollection"   Value="GenParticles"/>
+            <Item Name="ElectronCollection"      Value="slimmedElectronsUSER"/>
+            <Item Name="PhotonCollection"        Value="slimmedPhotonsUSER"/>
+            <Item Name="MuonCollection"          Value="slimmedMuonsUSER"/>
+            <Item Name="JetCollection"           Value="jetsAk4Puppi"/>
+            <Item Name="GenJetCollection"        Value="slimmedGenJets"/>
+            <Item Name="TopJetCollection"        Value="hotvrPuppi"/>
+            <Item Name="GenTopJetCollection"     Value="hotvrGen"/> <!-- Check odinary ak8GenJetsFat !--> <!-- new in ntuples! -->
+            <Item Name="METName"                 Value="slimmedMETsPuppi"/>
+            <Item Name="genMETName"              Value="slimmedMETs_GenMET"/>
+            <Item Name="lumi_file" Value="common/data/2018/Cert_314472-325175_13TeV_PromptReco_Collisions18_JSON.root"/>
+            <Item Name="lumihists_lumi_per_bin" Value="500.0"/>
+
+            <Item Name="additionalBranches" Value="is_muevt evt_weight is_triggered is_highpt" />
+
+      	    <Item Name="jersmear_direction" Value="nominal"/>
+      	    <Item Name="jecsmear_direction" Value="nominal"/>
+
+
+            <!-- the class name of the AnalysisModule subclasses to run: -->
+            <Item Name="AnalysisModule" Value="TstarTstarSelectionModule" />
+
+
+             <Item Name="pileup_directory" Value="common/data/2018/MyMCPileupHistogram.root" />
+             <Item Name="pileup_directory_data" Value="common/data/2018/MyDataPileupHistogram2018.root" />
+
+             <Item Name="HOTVRTopTagSFs" Value="/nfs/dust/cms/user/flabe/TstarTstar/CMSSW_10_2_17/src/UHH2/HOTVR/data/2016TopTaggingScaleFactors.root" />
+             <Item Name="SF_path" Value="/nfs/dust/cms/user/flabe/TstarTstar/CMSSW_10_2_17/src/UHH2/TstarTstar/factors/" />
+
+
+        </UserConfig>
+    </Cycle>
+</JobConfiguration>

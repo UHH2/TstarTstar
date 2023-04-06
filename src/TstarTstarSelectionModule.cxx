@@ -1,9 +1,10 @@
 #include <iostream>
 #include <memory>
 
+// TODO clean. Do i need all those?
+// UHH2 stuff
 #include "UHH2/core/include/AnalysisModule.h"
 #include "UHH2/core/include/Event.h"
-#include "UHH2/common/include/CommonModules.h"
 #include "UHH2/common/include/CleaningModules.h"
 #include "UHH2/common/include/ElectronHists.h"
 #include "UHH2/common/include/NSelections.h"
@@ -11,434 +12,1020 @@
 #include "UHH2/common/include/PhotonIds.h"
 #include "UHH2/common/include/MuonIds.h"
 #include "UHH2/common/include/TriggerSelection.h"
+#include "UHH2/common/include/TTbarGen.h"
+#include "UHH2/common/include/MCWeight.h"
+#include <UHH2/common/include/DetectorCleaning.h>
+#include "UHH2/common/include/JetIds.h"
+#include "UHH2/common/include/LeptonScaleFactors.h"
+#include "UHH2/common/include/TopPtReweight.h"
+#include "UHH2/common/include/MCWeight.h"
+
+// TstarTstar stuff
 #include "UHH2/TstarTstar/include/ModuleBASE.h"
 #include "UHH2/TstarTstar/include/TstarTstarSelections.h"
 #include "UHH2/TstarTstar/include/TstarTstarHists.h"
 #include "UHH2/TstarTstar/include/TstarTstarGenHists.h"
 #include "UHH2/TstarTstar/include/TstarTstarGenRecoMatchedHists.h"
-#include "UHH2/common/include/TTbarGen.h"
 #include "UHH2/TstarTstar/include/TstarTstarRecoTstarHists.h"
 #include "UHH2/TstarTstar/include/TstarTstarReconstructionModules.h"
+#include "UHH2/TstarTstar/include/TstarTstarScaleFactors.h"
+#include "UHH2/TstarTstar/include/ElecTriggerSF.h"
+#include "UHH2/TstarTstar/include/TstarTstarJetCorrectionHists.h"
+#include "UHH2/TstarTstar/include/JetMETCorrections.h"
 
-#include "UHH2/common/include/MCWeight.h"
+// HOTVR stuff
+#include "UHH2/HOTVR/include/HOTVRIds.h"
+#include "UHH2/HOTVR/include/HadronicTop.h"
+#include "UHH2/HOTVR/include/HOTVRScaleFactor.h"
+#include "UHH2/HOTVR/include/HOTVRJetCorrector.h"
+#include "UHH2/HOTVR/include/HOTVRJetCorrectionModule.h"
 
+// namespace definitions
 using namespace std;
 using namespace uhh2;
 
-//namespace uhh2 {
+namespace uhh2 {
 
-/** \brief Module for the full selection in T*T*->ttbar gg/gamma search 
+// quick method to calculate inv_mass
+float inv_mass(const LorentzVector& p4){ return p4.isTimelike() ? p4.mass() : -sqrt(-p4.mass2()); }
+
+/** \brief Module for the full selection in T*T*->ttbar gg search
  *
- * All objects are expected to be corrected in PreSelection stage
  *
  */
-// class TstarTstarSelectionModule: public AnalysisModule {
-class TstarTstarSelectionModule: public ModuleBASE {
+class TstarTstarSelectionModule: public AnalysisModule {
 public:
-    
+
     explicit TstarTstarSelectionModule(Context & ctx);
     virtual bool process(Event & event) override;
-    void book_histograms(uhh2::Context&, vector<string>);
-    void fill_histograms(uhh2::Event&, string, bool);
-    void book_TTreeVars(uhh2::Context& ctx, vector<string>);
-    void fill_TTreeVars(uhh2::Event & event, string var_name, float var_value);
-
-    void fill_MLinput(uhh2::Event & event);
 
 private:
-    
 
-    // Declare the Selections to use. Use unique_ptr to ensure automatic call of delete in the destructor,
-    // to avoid memory leaks.
+  // ###### Modules ######
+  // general
+  std::unique_ptr<JetMETCorrections> jetcorrections;
+  std::unique_ptr<AnalysisModule> AK4cleaner;
+  std::unique_ptr<AnalysisModule> reco_primlep;
+  std::unique_ptr<AnalysisModule> ttgenprod;
 
-    unique_ptr<Selection> TTbarSemiLepMatchable_selection;
-  
-    unique_ptr<Selection> triggerPFHT_sel;
-    unique_ptr<Selection> triggerSingleJet450_sel;
-    unique_ptr<Selection> triggerSingleLeptonEle1_sel;
-    unique_ptr<Selection> triggerSingleLeptonEle2_sel;
-    unique_ptr<Selection> triggerSingleLeptonEle3_sel;
-    unique_ptr<Selection> triggerSingleLeptonMu1_sel;
-    unique_ptr<Selection> triggerSingleLeptonMu2_sel;
-    unique_ptr<Selection> triggerSingleLeptonMu3_sel;
-    unique_ptr<Selection> triggerSingleLeptonMu4_sel;
-    unique_ptr<Selection> triggerHT1_sel, triggerHT2_sel, triggerHT3_sel, triggerHT4_sel, triggerHT5_sel,  triggerHT6_sel;
-    unique_ptr<Selection>  met_sel, st_sel; //selections defined in UHH2/TstarTstar/include/TstarTstarSelections.h
-    unique_ptr<Selection> topjet_selection;
+  // HOTVR-related
+  std::unique_ptr<AnalysisModule> HOTVRCorr;
+  std::unique_ptr<HOTVRJetLeptonCleaner> HOTVRjlc;
+  std::unique_ptr<TopJetCleaner> HOTVRcleaner;
 
-    unique_ptr<AnalysisModule> LumiWeight_module;
-    // Store the Hists collection as member variables. Again, use unique_ptr to avoid memory leaks.
-  //  std::unique_ptr<Hists> h_nocuts, h_common, h_lepsel, h_2dcut, h_semilepttbarmatch, h_nosemilepttbarmatch;// h_trigger;
-  //    std::unique_ptr<Hists> h_semilepttbarmatch_gen;
-  //    std::unique_ptr<Hists> h_semilepttbarmatch_genreco;
-  bool debug = false;
-  //  bool debug = true;
+  // scale factors
+  std::unique_ptr<AnalysisModule> ScaleFactor_btagging;
+  std::unique_ptr<AnalysisModule> ScaleFactor_NNLO;
+  std::unique_ptr<AnalysisModule> MCScaleVariations;
+  std::unique_ptr<AnalysisModule> TopPtReweighting;
 
-  //Tstar-Tstar reconstruction
-  std::unique_ptr<uhh2::AnalysisModule> ttgenprod; 
+  // lepton SFs
+  // muon
+  std::unique_ptr<AnalysisModule> sf_muon_iso;
+  std::unique_ptr<AnalysisModule> sf_muon_ID_lowpt;
+  std::unique_ptr<AnalysisModule> sf_muon_ID_highpt;
+  std::unique_ptr<AnalysisModule> sf_muon_trigger_lowpt;
+  std::unique_ptr<AnalysisModule> sf_muon_trigger_highpt;
+  std::unique_ptr<AnalysisModule> sf_muon_iso_DUMMY;
+  std::unique_ptr<AnalysisModule> sf_muon_ID_DUMMY;
+  std::unique_ptr<AnalysisModule> sf_muon_trigger_DUMMY;
+
+  // electron
+  std::unique_ptr<AnalysisModule> sf_ele_ID_lowpt;
+  std::unique_ptr<AnalysisModule> sf_ele_ID_highpt;
+  std::unique_ptr<AnalysisModule> sf_ele_reco;
+  std::unique_ptr<AnalysisModule> sf_ele_ID_DUMMY;
+  std::unique_ptr<AnalysisModule> sf_ele_reco_DUMMY;
+  std::unique_ptr<AnalysisModule> sf_ele_trigger; // no dummy needed as only applied when 1 electron present
+
+  // selections
+  unique_ptr<Selection> met_sel;
+  unique_ptr<Selection> twodcut_sel;
+  unique_ptr<HEMCleanerSelection> HEMCleaner;
+  unique_ptr<HEMCleanerMCScale> HEMCleanerMCScaler;
+
+  // ###### Histograms ######
+
+  // set of nominal ones
+  std::unique_ptr<Hists> h_beginSel,                 h_prefiring,                 h_jetcorrections,            h_jetcleaning,            h_triggerSF,             h_leptonSF,             h_HEMcut,             h_METcut,             h_AK4cut;
+  std::unique_ptr<Hists> h_HOTVRcut,                 h_bcorrections,              h_byield,                 h_btagcut,              h_2Dcut,              h_STcut,              h_theorycorrections;
+
+  // set of muon ones
+  std::unique_ptr<Hists> h_beginSel_mu,              h_prefiring_mu,              h_jetcorrections_mu,         h_jetcleaning_mu,         h_triggerSF_mu,           h_leptonSF_mu,           h_HEMcut_mu,           h_METcut_mu,           h_AK4cut_mu;
+  std::unique_ptr<Hists> h_HOTVRcut_mu,              h_bcorrections_mu,           h_byield_mu,              h_btagcut_mu,            h_2Dcut_mu,            h_STcut_mu,            h_theorycorrections_mu;
+  std::unique_ptr<Hists> h_beginSel_mu_lowpt,        h_prefiring_mu_lowpt,        h_jetcorrections_mu_lowpt,   h_jetcleaning_mu_lowpt,   h_triggerSF_mu_lowpt,     h_leptonSF_mu_lowpt,     h_HEMcut_mu_lowpt,     h_METcut_mu_lowpt,     h_AK4cut_mu_lowpt;
+  std::unique_ptr<Hists> h_HOTVRcut_mu_lowpt,        h_bcorrections_mu_lowpt,     h_byield_mu_lowpt,        h_btagcut_mu_lowpt,      h_2Dcut_mu_lowpt,      h_STcut_mu_lowpt,      h_theorycorrections_mu_lowpt;
+  std::unique_ptr<Hists> h_beginSel_mu_highpt,       h_prefiring_mu_highpt,       h_jetcorrections_mu_highpt,  h_jetcleaning_mu_highpt,  h_triggerSF_mu_highpt,    h_leptonSF_mu_highpt,    h_HEMcut_mu_highpt,    h_METcut_mu_highpt,    h_AK4cut_mu_highpt;
+  std::unique_ptr<Hists> h_HOTVRcut_mu_highpt,       h_bcorrections_mu_highpt,    h_byield_mu_highpt,       h_btagcut_mu_highpt,     h_2Dcut_mu_highpt,     h_STcut_mu_highpt,     h_theorycorrections_mu_highpt;
+
+  // set of electron ones
+  std::unique_ptr<Hists> h_beginSel_ele,             h_prefiring_ele,             h_jetcorrections_ele,        h_jetcleaning_ele,        h_triggerSF_ele,          h_leptonSF_ele,          h_HEMcut_ele,          h_METcut_ele,          h_AK4cut_ele;
+  std::unique_ptr<Hists> h_HOTVRcut_ele,             h_bcorrections_ele,          h_byield_ele,             h_btagcut_ele,           h_2Dcut_ele,           h_STcut_ele,           h_theorycorrections_ele;
+  std::unique_ptr<Hists> h_beginSel_ele_lowpt,       h_prefiring_ele_lowpt,       h_jetcorrections_ele_lowpt,  h_jetcleaning_ele_lowpt,  h_triggerSF_ele_lowpt,    h_leptonSF_ele_lowpt,    h_HEMcut_ele_lowpt,    h_METcut_ele_lowpt,    h_AK4cut_ele_lowpt;
+  std::unique_ptr<Hists> h_HOTVRcut_ele_lowpt,       h_bcorrections_ele_lowpt,    h_byield_ele_lowpt,       h_btagcut_ele_lowpt,     h_2Dcut_ele_lowpt,     h_STcut_ele_lowpt,     h_theorycorrections_ele_lowpt;
+  std::unique_ptr<Hists> h_beginSel_ele_highpt,      h_prefiring_ele_highpt,      h_jetcorrections_ele_highpt, h_jetcleaning_ele_highpt, h_triggerSF_ele_highpt,   h_leptonSF_ele_highpt,   h_HEMcut_ele_highpt,   h_METcut_ele_highpt,   h_AK4cut_ele_highpt;
+  std::unique_ptr<Hists> h_HOTVRcut_ele_highpt,      h_bcorrections_ele_highpt,   h_byield_ele_highpt,      h_btagcut_ele_highpt,    h_2Dcut_ele_highpt,    h_STcut_ele_highpt,    h_theorycorrections_ele_highpt;
+
+  // no-btag CR histograms for all steps after btagcut
+  std::unique_ptr<Hists> h_nob_btagcut,              h_nob_2Dcut,                 h_nob_STcut,              h_nob_theorycorrections;
+  std::unique_ptr<Hists> h_nob_btagcut_mu,           h_nob_2Dcut_mu,              h_nob_STcut_mu,           h_nob_theorycorrections_mu;
+  std::unique_ptr<Hists> h_nob_btagcut_mu_lowpt,     h_nob_2Dcut_mu_lowpt,        h_nob_STcut_mu_lowpt,     h_nob_theorycorrections_mu_lowpt;
+  std::unique_ptr<Hists> h_nob_btagcut_mu_highpt,    h_nob_2Dcut_mu_highpt,       h_nob_STcut_mu_highpt,    h_nob_theorycorrections_mu_highpt;
+  std::unique_ptr<Hists> h_nob_btagcut_ele,          h_nob_2Dcut_ele,             h_nob_STcut_ele,          h_nob_theorycorrections_ele;
+  std::unique_ptr<Hists> h_nob_btagcut_ele_lowpt,    h_nob_2Dcut_ele_lowpt,       h_nob_STcut_ele_lowpt,    h_nob_theorycorrections_ele_lowpt;
+  std::unique_ptr<Hists> h_nob_btagcut_ele_highpt,   h_nob_2Dcut_ele_highpt,      h_nob_STcut_ele_highpt,   h_nob_theorycorrections_ele_highpt;
+
+  // ttbar control region
+  std::unique_ptr<Hists> h_theorycorrections_ttbar;
+
+  // set of jet correction hists
+  std::unique_ptr<Hists> h_jetCorr_beginSel,          h_jetCorr_prefiring,        h_jetCorr_jetcorrections,          h_jetCorr_jetcleaning,         h_jetCorr_theorycorrections;
+  std::unique_ptr<Hists> h_jetCorr_beginSel_mu,       h_jetCorr_prefiring_mu,     h_jetCorr_jetcorrections_mu,       h_jetCorr_jetcleaning_mu,      h_jetCorr_theorycorrections_mu;
+  std::unique_ptr<Hists> h_jetCorr_beginSel_ele,      h_jetCorr_prefiring_ele,    h_jetCorr_jetcorrections_ele,      h_jetCorr_jetcleaning_ele,     h_jetCorr_theorycorrections_ele;
+
+  // ###### Handles ######
+  uhh2::Event::Handle<bool> h_trigger_decision;
+  uhh2::Event::Handle<FlavorParticle> h_primlep;
   uhh2::Event::Handle<TTbarGen> h_ttbargen;
-  std::unique_ptr<uhh2::AnalysisModule> reco_primlep;
-  std::unique_ptr<uhh2::AnalysisModule> ttbar_reco;
-  std::unique_ptr<ttbarChi2Discriminator> ttbar_discriminator;
-  //  std::unique_ptr<ttbarCorrectMatchDiscriminator> ttbar_CorrectMatchDiscriminator;
-  std::unique_ptr<CorrectMatchDiscriminator> ttbar_CorrectMatchDiscriminator;
-  std::unique_ptr<TstarTstar_Reconstruction> TstarTstar_reco;
-  std::unique_ptr<TstarTstar_tgluon_tgluon_Reconstruction> TstarTstar_tgluon_tgluon_reco;
-  //  uhh2::Event::Handle<std::vector<ReconstructionHypothesis>> h_ttbar_hyps;
-  uhh2::Event::Handle<bool> h_is_ttbar_reconstructed;
-  uhh2::Event::Handle<ReconstructionHypothesis> h_recohyp;
+  uhh2::Event::Handle<bool> h_is_muevt;
+  uhh2::Event::Handle<bool> h_is_highpt;
+  uhh2::Event::Handle<double> h_evt_weight;
+  uhh2::Event::Handle<double> h_ST_AK4;
+  uhh2::Event::Handle<double> h_ST_HOTVR;
+  uhh2::Event::Handle<bool> h_is_btagevent;
+  uhh2::Event::Handle<bool> h_is_ttbarCR;
+  uhh2::Event::Handle<bool> h_MC_isfake2017B;
+  uhh2::Event::Handle<bool> h_MC_isfake2016B;
 
-  uhh2::Event::Handle<std::vector<ReconstructionTstarHypothesis>> h_tstartstar_hyps;
-  uhh2::Event::Handle<ReconstructionTstarHypothesis> h_recohyp_tstartstar;
 
-  std::unique_ptr<TstarTstarRecoTstarHists>  h_RecoPlots_After_TstarTstar_tgtg, h_RecoPlots_After_TstarTstar_tgtg_ttbarsemilep;
+  // ###### other needed definitions ######
+  bool debug = false;
+  bool is_MC;
+  bool data_isMu = false;
+  bool data_isEG = false;
+  bool data_isEle = false;
+  bool data_isPho = false;
+  bool isTriggerSFMeasurement = false;
+  TString year;
+  TString Prefiring_direction;
 
-  bool is_tgtg, is_tgtgamma;
-  std::vector<Event::Handle<float>> h_MLinput_values;
-  std::vector<string> h_MLinput_names;
-  Event::Handle<float> h_weight;
+  // event yield factors, needed for b-tagging SFs.
+  TH2D *eventYieldFactors;
 
 };
 
-void TstarTstarSelectionModule::book_histograms(uhh2::Context& ctx, vector<string> tags){
-  for(const auto & tag : tags){
-    string  mytag = tag + "_RECO";
-    book_HFolder(mytag, new TstarTstarHists(ctx,mytag));
-    mytag = tag + "_GEN";
-    book_HFolder(mytag, new TstarTstarGenHists(ctx,mytag));
-    mytag = tag + "_GENRECO";
-    book_HFolder(mytag, new TstarTstarGenRecoMatchedHists(ctx,mytag));
-  }
-}
 
-  void TstarTstarSelectionModule::fill_histograms(uhh2::Event& event, string tag, bool pass_ttbarsemilep){
-    //  for(const auto & tag : tags){
-    string mytag = tag + "_RECO";
-    HFolder(mytag)->fill(event);
-    if(pass_ttbarsemilep){
-      mytag = tag + "_GEN";
-      HFolder(mytag)->fill(event);
-      mytag = tag + "_GENRECO";
-      HFolder(mytag)->fill(event);
-    }
-    //  }
-}
-  
-void TstarTstarSelectionModule::book_TTreeVars(uhh2::Context& ctx, vector<string> vars){
-  for(const auto & var : vars){
-    string  myvar = "TstarTstarReco_" + var;
-    Event::Handle<float> dummy;
-    h_MLinput_values.push_back(dummy);
-    h_MLinput_names.push_back(myvar);
-    h_MLinput_values[h_MLinput_values.size()-1] = ctx.declare_event_output<float>(myvar);
-  }
-}
+TstarTstarSelectionModule::TstarTstarSelectionModule(Context & ctx) {
 
-void TstarTstarSelectionModule::fill_TTreeVars(uhh2::Event& event,string var_name, float var_value){ //fill the variable with calculated value
-  for(unsigned int iname = 0; iname<h_MLinput_names.size(); iname++){
-    if(h_MLinput_names[iname]==var_name)  event.set(h_MLinput_values[iname],var_value);
-  }
-}
+  // setting debug from xml file
+  if(ctx.get("debug", "<not set>") == "true") debug = true;
 
-void TstarTstarSelectionModule::fill_MLinput(uhh2::Event & event){
-  ReconstructionTstarHypothesis hyp_Tstar = event.get(h_recohyp_tstartstar);  
-  ReconstructionHypothesis hyp_ttbar = hyp_Tstar.ttbar_hyp();
-
-  //lepton
-  float lep_pt = hyp_ttbar.lepton().pt();
-  fill_TTreeVars(event, "TstarTstarReco_lepton_pt", lep_pt);
-  float lep_eta = hyp_ttbar.lepton().eta();
-  fill_TTreeVars(event, "TstarTstarReco_lepton_eta", lep_eta);
-  float lep_phi = hyp_ttbar.lepton().phi();
-  fill_TTreeVars(event, "TstarTstarReco_lepton_phi", lep_phi);
-
-  //dR
-  float dR_ttbar = deltaR(hyp_ttbar.toplep_v4(),hyp_ttbar.tophad_v4());
-  fill_TTreeVars(event, "TstarTstarReco_dR_ttbar", dR_ttbar);
-  float dR_gluon_toplep = deltaR(hyp_Tstar.gluon1_v4(),hyp_ttbar.toplep_v4());
-  fill_TTreeVars(event, "TstarTstarReco_dR_gluon_toplep", dR_gluon_toplep);
-  float dR_gluon_tophad = deltaR(hyp_Tstar.gluon1_v4(),hyp_ttbar.tophad_v4());
-  fill_TTreeVars(event, "TstarTstarReco_dR_gluon_tophad", dR_gluon_tophad);
-  float dR_tstartstar = deltaR(hyp_Tstar.tstarlep_v4(),hyp_Tstar.tstarhad_v4());
-  fill_TTreeVars(event, "TstarTstarReco_dR_tstartstar", dR_tstartstar);
-
-  //gluon
-  float gluon_pt = hyp_Tstar.gluon1_v4().pt();
-  float gluon_eta = hyp_Tstar.gluon1_v4().eta();
-  float gluon_phi = hyp_Tstar.gluon1_v4().phi();
-  fill_TTreeVars(event, "TstarTstarReco_gluon_pt", gluon_pt);
-  fill_TTreeVars(event, "TstarTstarReco_gluon_eta", gluon_eta);
-  fill_TTreeVars(event, "TstarTstarReco_gluon_phi", gluon_phi);
-
-  //Tstar leptonic and hadronic
-  float Tstarlep_pt = hyp_Tstar.tstarlep_v4().pt();
-  float Tstarlep_eta = hyp_Tstar.tstarlep_v4().eta();
-  float Tstarlep_phi = hyp_Tstar.tstarlep_v4().phi();
-  float Tstarhad_pt = hyp_Tstar.tstarhad_v4().pt();
-  float Tstarhad_eta = hyp_Tstar.tstarhad_v4().eta();
-  float Tstarhad_phi = hyp_Tstar.tstarhad_v4().phi();
-
-  fill_TTreeVars(event, "TstarTstarReco_Tstarlep_pt", Tstarlep_pt);
-  fill_TTreeVars(event, "TstarTstarReco_Tstarlep_eta", Tstarlep_eta);
-  fill_TTreeVars(event, "TstarTstarReco_Tstarlep_phi", Tstarlep_phi);
-  fill_TTreeVars(event, "TstarTstarReco_Tstarhad_pt", Tstarhad_pt);
-  fill_TTreeVars(event, "TstarTstarReco_Tstarhad_eta", Tstarhad_eta);
-  fill_TTreeVars(event, "TstarTstarReco_Tstarhad_phi", Tstarhad_phi);
-
-
-}
-
-
-TstarTstarSelectionModule::TstarTstarSelectionModule(Context & ctx){
-    
-  is_tgtg = false; is_tgtgamma = false;
-  if(ctx.get("channel") == "tgtg") is_tgtg = true;
-  if(ctx.get("channel") == "tgtgamma") is_tgtgamma = true;
-  ctx.undeclare_all_event_output();//store only what we really want later
-
-  h_weight = ctx.declare_event_output<float>("eventweight");
-
+  // debug message
   if(debug) {
-    cout << "Hello World from TstarTstarSelectionModule!" << endl;  
-    
-    // If running in SFrame, the keys "dataset_version", "dataset_type", "dataset_lumi",
-    // and "target_lumi" are set to the according values in the xml file. For CMSSW, these are
-    // not set automatically, but can be set in the python config file.
-    for(auto & kv : ctx.get_all()){
-        cout << " " << kv.first << " = " << kv.second << endl;
-    }
-    
-   }
+    cout << "Hello World from TstarTstarSelectionModule!" << endl;
+    for(auto & kv : ctx.get_all()){cout << " " << kv.first << " = " << kv.second << endl;}
+  }
 
-    // 1. setup common selection  module -> skipped here, because done at preselection
-    // 1b. set up lumi rewitghting
-    LumiWeight_module.reset(new MCLumiWeight(ctx));
-    
+  // ###### 0. Setting variables ######
+  // MC or real data
+  is_MC = ctx.get("dataset_type") == "MC";
 
-    // 2. set up selections
-    //Trigger selection
-    //
+  // getting SF file path
+  string SF_path = ctx.get("SF_path");
 
-    //HT triggers
-    triggerHT1_sel.reset(new TriggerSelection("HLT_HT430to450_v*"));
-    triggerHT2_sel.reset(new TriggerSelection("HLT_HT450to470_v*"));
-    triggerHT3_sel.reset(new TriggerSelection("HLT_HT470to500_v*"));
-    triggerHT4_sel.reset(new TriggerSelection("HLT_HT500to550_v*"));
-    triggerHT5_sel.reset(new TriggerSelection("HLT_HT550to650_v*"));
-    triggerHT6_sel.reset(new TriggerSelection("HLT_HT650_v*"));
+  // checking if this is trigger file measurement
+  string IsTriggerSFMeasurement = ctx.get("IsTriggerSFMeasurement", "False");
+  if(IsTriggerSFMeasurement == "True") isTriggerSFMeasurement = true;
 
-    //PF HT trigger
-    triggerPFHT_sel.reset(new TriggerSelection("HLT_PFHT900_v*"));
+  // year of samples
+  year = ctx.get("year", "<not set>");
+  if(year == "<not set>"){
+    if(ctx.get("dataset_version").find("2016") != std::string::npos) year = "2016";
+    else if(ctx.get("dataset_version").find("2017") != std::string::npos) year = "2017";
+    else if(ctx.get("dataset_version").find("2018") != std::string::npos) year = "2018";
+    else if(ctx.get("dataset_version").find("UL16preVFP") != std::string::npos) year = "UL16preVFP";
+    else if(ctx.get("dataset_version").find("UL16postVFP") != std::string::npos) year = "UL16postVFP";
+    else if(ctx.get("dataset_version").find("UL17") != std::string::npos) year = "UL17";
+    else if(ctx.get("dataset_version").find("UL18") != std::string::npos) year = "UL18";
+    else throw "No year found in dataset name!";
+  }
+  if(debug) cout << "Year is " << year << "." << endl;
 
-    //SingleJet trigger
-    triggerSingleJet450_sel.reset(new TriggerSelection("HLT_PFJet450_v*"));
+  // if its a data sample, check what kind
+  if(!is_MC) {
+    data_isMu = (ctx.get("dataset_version").find("SingleMuon") != std::string::npos);
+    data_isEle = (ctx.get("dataset_version").find("SingleElectron") != std::string::npos);
+    data_isPho = (ctx.get("dataset_version").find("SinglePhoton") != std::string::npos);
+    data_isEG = (ctx.get("dataset_version").find("EGamma") != std::string::npos);
 
-    //Lepton trigger
-    triggerSingleLeptonEle1_sel.reset(new TriggerSelection("HLT_Ele115_CaloIdVT_GsfTrkIdT_v*"));
-    triggerSingleLeptonEle2_sel.reset(new TriggerSelection("HLT_Ele25_eta2p1_WPTight_Gsf_v*"));
-    triggerSingleLeptonEle3_sel.reset(new TriggerSelection("HLT_Ele32_eta2p1_WPTight_Gsf_v*"));
+    if(data_isMu) std::cout << "This data sample is a muon sample." << std::endl;
+    if(data_isPho) std::cout << "This data sample is a photon sample" << std::endl;
+    if(data_isEle) std::cout << "This data sample is an electron sample." << std::endl;
+    if(data_isEG) std::cout << "This data sample is an egamma sample" << std::endl;
+  }
+
+  // ###### 1. Set up modules ######
+
+  // common modules was replaced here
+  // I'll use the jet correction module from Christopher
+  // this will do the following
+  // - Jet corrections
+  // - Jet resolution smearing
+  // - PF ID Jet cleaning
+  // - Jet Lepton Cleaning
+  jetcorrections.reset(new JetMETCorrections());
+  jetcorrections->switch_met_xy_correction(false); // I do not want to apply these
+  jetcorrections->init(ctx);  
+  
+  // - JetCleaner
+  const JetId jetID = PtEtaCut(30, 2.5); // only this needed, PFID is done within jet correction module
+  AK4cleaner.reset(new JetCleaner(ctx, jetID));
+
+  // correcting and cleaning HOTVR
+  HOTVRjlc.reset(new HOTVRJetLeptonCleaner());
+  HOTVRCorr.reset(new HOTVRJetCorrectionModule(ctx));
+  HOTVRcleaner.reset(new TopJetCleaner(ctx, AndId<Jet>(PtEtaCut(200, 2.5), JetPFID(JetPFID::WP_TIGHT_PUPPI)) ));
+
+  // primary lepton
+  reco_primlep.reset(new PrimaryLepton(ctx));
+
+  // lepton scale factors
+  // electrons
+  if(debug) cout << "Setting up electron scale." << endl;
+  sf_ele_reco.reset( new uhh2::ElectronRecoScaleFactors(ctx) );
+  sf_ele_reco_DUMMY.reset(new uhh2::ElectronRecoScaleFactors(ctx, boost::none, boost::none, boost::none, boost::none, true) );
+  sf_ele_ID_lowpt.reset(new uhh2::ElectronIdScaleFactors(ctx, Electron::mvaEleID_Fall17_iso_V2_wp90) );
+  sf_ele_ID_highpt.reset( new uhh2::ElectronIdScaleFactors(ctx, Electron::mvaEleID_Fall17_noIso_V2_wp90) );
+  sf_ele_ID_DUMMY.reset( new uhh2::ElectronIdScaleFactors(ctx, boost::none, boost::none, boost::none, boost::none, true) );
+  if(!isTriggerSFMeasurement) sf_ele_trigger.reset( new uhh2::ElecTriggerSF(ctx, "central", "eta_ptbins", year) );
+
+  // muons
+  if(debug) cout << "Setting up muon scale." << endl;
+  sf_muon_ID_lowpt.reset( new uhh2::MuonIdScaleFactors(ctx, Muon::CutBasedIdTight) );
+  sf_muon_ID_highpt.reset( new uhh2::MuonIdScaleFactors(ctx, Muon::CutBasedIdGlobalHighPt) );
+  sf_muon_ID_DUMMY.reset( new uhh2::MuonIdScaleFactors(ctx, boost::none, boost::none, boost::none, boost::none, true) );
+  sf_muon_iso.reset( new uhh2::MuonIsoScaleFactors(ctx, Muon::PFIsoTight, Muon::CutBasedIdTight) ); // only for low pt
+  sf_muon_iso_DUMMY.reset( new uhh2::MuonIsoScaleFactors(ctx, boost::none, boost::none, boost::none, boost::none, boost::none, true) );
+  sf_muon_trigger_lowpt.reset( new uhh2::MuonTriggerScaleFactors(ctx, false) );
+  sf_muon_trigger_highpt.reset( new uhh2::MuonTriggerScaleFactors(ctx, true, false) );
+  sf_muon_trigger_DUMMY.reset( new uhh2::MuonTriggerScaleFactors(ctx, boost::none, boost::none, boost::none, boost::none, boost::none, true) );
+
+  // b-tagging scale factors
+  if(debug) cout << "Setting up btagging scale." << endl;
+  ScaleFactor_btagging.reset(new MCBTagDiscriminantReweighting(ctx, BTag::algo::DEEPJET)); // should be enough like this
+  if(is_MC) { // TODO put this into a module at some point
+    TFile *f = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/btagYieldSFs_"+year+".root");
+    TString sample_string = "";
+    if(ctx.get("dataset_version").find("TT") != std::string::npos) sample_string = "TTbar";
+    else if(ctx.get("dataset_version").find("ST") != std::string::npos) sample_string = "ST";
+    else if(ctx.get("dataset_version").find("WJets") != std::string::npos) sample_string = "WJets";
+    else if(ctx.get("dataset_version").find("QCD") != std::string::npos) sample_string = "QCD";
+    else if(ctx.get("dataset_version").find("Diboson") != std::string::npos) sample_string = "VV";
+    else if(ctx.get("dataset_version").find("DY") != std::string::npos) sample_string = "DYJets";
+    else if(ctx.get("dataset_version").find("Tstar") != std::string::npos) sample_string = "TstarTstar";
+    if(debug) std::cout << "Apply 2D b-taggin yield SFs for " << sample_string << std::endl;
+
+    if(sample_string != "") eventYieldFactors = (TH2D*)f->Get(sample_string);
+    else throw std::runtime_error("Error: can not determine sample type for btagging yield SFs.");
+  }
+
+  // ttbar on GEN
+  if(is_MC) ttgenprod.reset(new TTbarGenProducer(ctx, "ttbargen", false));
+
+  // corrections
+  ScaleFactor_NNLO.reset(new NLOCorrections(ctx));
+  TopPtReweighting.reset( new TopPtReweight(ctx, 0.0615, -0.0005, "ttbargen", "weight_ttbar", true) );
+
+  Prefiring_direction = ctx.get("Sys_prefiring", "nominal");
+  MCScaleVariations.reset(new MCScaleVariation(ctx) );
+
+  // ###### 2. set up selections ######
+  if(debug) cout << "Setting up Selections." << endl;
+
+  // MET selection
+  met_sel.reset(new METCut  (50.,1e9));
+
+  // 2D cut
+  twodcut_sel.reset(new TwoDCut(0.4, 25.0));  // The same as in Z'->ttbar semileptonic
+
+  // HEM cut
+  HEMCleaner.reset(new HEMCleanerSelection(ctx, "jets", "topjets"));
+  HEMCleanerMCScaler.reset(new HEMCleanerMCScale(ctx, "jets", "topjets"));
 
 
-    triggerSingleLeptonMu1_sel.reset(new TriggerSelection("HLT_Mu50_v*"));
-    triggerSingleLeptonMu2_sel.reset(new TriggerSelection("HLT_Mu55_v*"));
-    triggerSingleLeptonMu3_sel.reset(new TriggerSelection("HLT_IsoMu24_v*"));
-    triggerSingleLeptonMu4_sel.reset(new TriggerSelection("HLT_IsoTkMu24_v*"));
+  // ###### 3. Set up Hists ######
+  if(debug) cout << "Setting up Hists." << endl;
 
-    //MET selection
-    met_sel.reset(new METCut  (50.,1e6));
+  h_beginSel.reset(new TstarTstarHists(ctx, "beginSel"));
+  h_beginSel_mu.reset(new TstarTstarHists(ctx, "beginSel_mu"));
+  h_beginSel_mu_lowpt.reset(new TstarTstarHists(ctx, "beginSel_mu_lowpt"));
+  h_beginSel_mu_highpt.reset(new TstarTstarHists(ctx, "beginSel_mu_highpt"));
+  h_beginSel_ele.reset(new TstarTstarHists(ctx, "beginSel_ele"));
+  h_beginSel_ele_lowpt.reset(new TstarTstarHists(ctx, "beginSel_ele_lowpt"));
+  h_beginSel_ele_highpt.reset(new TstarTstarHists(ctx, "beginSel_ele_highpt"));
 
-    //ST selection
-    st_sel.reset(new STCut  (500.,1e6));
+  h_prefiring.reset(new TstarTstarHists(ctx, "prefiring"));
+  h_prefiring_mu.reset(new TstarTstarHists(ctx, "prefiring_mu"));
+  h_prefiring_mu_lowpt.reset(new TstarTstarHists(ctx, "prefiring_mu_lowpt"));
+  h_prefiring_mu_highpt.reset(new TstarTstarHists(ctx, "prefiring_mu_highpt"));
+  h_prefiring_ele.reset(new TstarTstarHists(ctx, "prefiring_ele"));
+  h_prefiring_ele_lowpt.reset(new TstarTstarHists(ctx, "prefiring_ele_lowpt"));
+  h_prefiring_ele_highpt.reset(new TstarTstarHists(ctx, "prefiring_ele_highpt"));
 
-    //Ak8jet selection
-    topjet_selection.reset(new NTopJetSelection(1, -1, TopJetId(PtEtaCut(100, 2.1))));
+  h_jetcorrections.reset(new TstarTstarHists(ctx, "jetcorrections"));
+  h_jetcorrections_mu.reset(new TstarTstarHists(ctx, "jetcorrections_mu"));
+  h_jetcorrections_mu_lowpt.reset(new TstarTstarHists(ctx, "jetcorrections_mu_lowpt"));
+  h_jetcorrections_mu_highpt.reset(new TstarTstarHists(ctx, "jetcorrections_mu_highpt"));
+  h_jetcorrections_ele.reset(new TstarTstarHists(ctx, "jetcorrections_ele"));
+  h_jetcorrections_ele_lowpt.reset(new TstarTstarHists(ctx, "jetcorrections_ele_lowpt"));
+  h_jetcorrections_ele_highpt.reset(new TstarTstarHists(ctx, "jetcorrections_ele_highpt"));
 
-    //Match to semileptonic ttbar
-    TTbarSemiLepMatchable_selection.reset(new TTbarSemiLepMatchableSelection());// for x-checks
+  h_jetcleaning.reset(new TstarTstarHists(ctx, "jetcleaning"));
+  h_jetcleaning_mu.reset(new TstarTstarHists(ctx, "jetcleaning_mu"));
+  h_jetcleaning_mu_lowpt.reset(new TstarTstarHists(ctx, "jetcleaning_mu_lowpt"));
+  h_jetcleaning_mu_highpt.reset(new TstarTstarHists(ctx, "jetcleaning_mu_highpt"));
+  h_jetcleaning_ele.reset(new TstarTstarHists(ctx, "jetcleaning_ele"));
+  h_jetcleaning_ele_lowpt.reset(new TstarTstarHists(ctx, "jetcleaning_ele_lowpt"));
+  h_jetcleaning_ele_highpt.reset(new TstarTstarHists(ctx, "jetcleaning_ele_highpt"));
 
-    // 3. Set up Tstar-Tstar reconstruction
-    ttgenprod.reset(new TTbarGenProducer(ctx, "ttbargen", false));
-    h_ttbargen = ctx.get_handle<TTbarGen>("ttbargen");
+  h_triggerSF.reset(new TstarTstarHists(ctx, "triggerSF"));
+  h_triggerSF_mu.reset(new TstarTstarHists(ctx, "triggerSF_mu"));
+  h_triggerSF_mu_lowpt.reset(new TstarTstarHists(ctx, "triggerSF_mu_lowpt"));
+  h_triggerSF_mu_highpt.reset(new TstarTstarHists(ctx, "triggerSF_mu_highpt"));
+  h_triggerSF_ele.reset(new TstarTstarHists(ctx, "triggerSF_ele"));
+  h_triggerSF_ele_lowpt.reset(new TstarTstarHists(ctx, "triggerSF_ele_lowpt"));
+  h_triggerSF_ele_highpt.reset(new TstarTstarHists(ctx, "triggerSF_ele_highpt"));
 
-    const std::string ttbar_hyps_label("TTbarReconstruction");
-    const std::string ttbar_chi2_label("Chi2");
-    reco_primlep.reset(new PrimaryLepton(ctx));
-    if(is_tgtg){
-      ttbar_reco.reset(new HighMassSkipJetsTTbarReconstruction(ctx, NeutrinoReconstruction,ttbar_hyps_label,0));
-      //      h_ttbar_hyps = ctx.get_handle<std::vector<ReconstructionHypothesis>>(ttbar_hyps_label);
-      h_is_ttbar_reconstructed = ctx.get_handle< bool >("is_ttbar_reconstructed_chi2");
-      h_recohyp = ctx.declare_event_output<ReconstructionHypothesis>(ttbar_hyps_label+"_best");
+  h_leptonSF.reset(new TstarTstarHists(ctx, "leptonSF"));
+  h_leptonSF_mu.reset(new TstarTstarHists(ctx, "leptonSF_mu"));
+  h_leptonSF_mu_lowpt.reset(new TstarTstarHists(ctx, "leptonSF_mu_lowpt"));
+  h_leptonSF_mu_highpt.reset(new TstarTstarHists(ctx, "leptonSF_mu_highpt"));
+  h_leptonSF_ele.reset(new TstarTstarHists(ctx, "leptonSF_ele"));
+  h_leptonSF_ele_lowpt.reset(new TstarTstarHists(ctx, "leptonSF_ele_lowpt"));
+  h_leptonSF_ele_highpt.reset(new TstarTstarHists(ctx, "leptonSF_ele_highpt"));
 
-      const std::string tstartstar_hyps_label("TstarTstar_tgtg");
-      h_tstartstar_hyps = ctx.get_handle<std::vector<ReconstructionTstarHypothesis>>(tstartstar_hyps_label);
-      h_recohyp_tstartstar = ctx.declare_event_output<ReconstructionTstarHypothesis>(tstartstar_hyps_label+"_best");
-    }
-    if(is_tgtgamma){
-      ttbar_reco.reset(new HighMassSkipJetsTTbarReconstruction(ctx, NeutrinoReconstruction,ttbar_hyps_label,1));
-      //      h_ttbar_hyps = ctx.get_handle<std::vector<ReconstructionHypothesis>>(ttbar_hyps_label);
-      h_is_ttbar_reconstructed = ctx.get_handle< bool >("is_ttbar_reconstructed_chi2");
-      h_recohyp = ctx.declare_event_output<ReconstructionHypothesis>(ttbar_hyps_label+"_best");
+  h_HEMcut.reset(new TstarTstarHists(ctx, "HEMcut"));
+  h_HEMcut_mu.reset(new TstarTstarHists(ctx, "HEMcut_mu"));
+  h_HEMcut_mu_lowpt.reset(new TstarTstarHists(ctx, "HEMcut_mu_lowpt"));
+  h_HEMcut_mu_highpt.reset(new TstarTstarHists(ctx, "HEMcut_mu_highpt"));
+  h_HEMcut_ele.reset(new TstarTstarHists(ctx, "HEMcut_ele"));
+  h_HEMcut_ele_lowpt.reset(new TstarTstarHists(ctx, "HEMcut_ele_lowpt"));
+  h_HEMcut_ele_highpt.reset(new TstarTstarHists(ctx, "HEMcut_ele_highpt"));
 
-      const std::string tstartstar_hyps_label("TstarTstar_tgtgamma");
-      h_tstartstar_hyps = ctx.get_handle<std::vector<ReconstructionTstarHypothesis>>(tstartstar_hyps_label);
-      h_recohyp_tstartstar = ctx.declare_event_output<ReconstructionTstarHypothesis>(tstartstar_hyps_label+"_best");
-    }
+  h_METcut.reset(new TstarTstarHists(ctx, "METcut"));
+  h_METcut_mu.reset(new TstarTstarHists(ctx, "METcut_mu"));
+  h_METcut_mu_lowpt.reset(new TstarTstarHists(ctx, "METcut_mu_lowpt"));
+  h_METcut_mu_highpt.reset(new TstarTstarHists(ctx, "METcut_mu_highpt"));
+  h_METcut_ele.reset(new TstarTstarHists(ctx, "METcut_ele"));
+  h_METcut_ele_lowpt.reset(new TstarTstarHists(ctx, "METcut_ele_lowpt"));
+  h_METcut_ele_highpt.reset(new TstarTstarHists(ctx, "METcut_ele_highpt"));
 
-    ttbar_discriminator.reset(new ttbarChi2Discriminator(ctx));
-    ttbar_CorrectMatchDiscriminator.reset(new CorrectMatchDiscriminator(ctx,ttbar_hyps_label));
+  h_AK4cut.reset(new TstarTstarHists(ctx, "AK4cut"));
+  h_AK4cut_mu.reset(new TstarTstarHists(ctx, "AK4cut_mu"));
+  h_AK4cut_mu_lowpt.reset(new TstarTstarHists(ctx, "AK4cut_mu_lowpt"));
+  h_AK4cut_mu_highpt.reset(new TstarTstarHists(ctx, "AK4cut_mu_highpt"));
+  h_AK4cut_ele.reset(new TstarTstarHists(ctx, "AK4cut_ele"));
+  h_AK4cut_ele_lowpt.reset(new TstarTstarHists(ctx, "AK4cut_ele_lowpt"));
+  h_AK4cut_ele_highpt.reset(new TstarTstarHists(ctx, "AK4cut_ele_highpt"));
 
-    TstarTstar_reco.reset(new TstarTstar_Reconstruction(ctx));
-    TstarTstar_tgluon_tgluon_reco.reset(new TstarTstar_tgluon_tgluon_Reconstruction(ctx));
+  h_HOTVRcut.reset(new TstarTstarHists(ctx, "HOTVRcut"));
+  h_HOTVRcut_mu.reset(new TstarTstarHists(ctx, "HOTVRcut_mu"));
+  h_HOTVRcut_mu_lowpt.reset(new TstarTstarHists(ctx, "HOTVRcut_mu_lowpt"));
+  h_HOTVRcut_mu_highpt.reset(new TstarTstarHists(ctx, "HOTVRcut_mu_highpt"));
+  h_HOTVRcut_ele.reset(new TstarTstarHists(ctx, "HOTVRcut_ele"));
+  h_HOTVRcut_ele_lowpt.reset(new TstarTstarHists(ctx, "HOTVRcut_ele_lowpt"));
+  h_HOTVRcut_ele_highpt.reset(new TstarTstarHists(ctx, "HOTVRcut_ele_highpt"));
 
-    // 4. Set up Hists
-    vector<string> histogram_tags = {"PreSelection","PreSelection_mu","PreSelection_ele","AK8sel","AK8sel_mu","AK8sel_ele",
-				     "MET","MET_mu","MET_ele","ST","ST_mu","ST_ele","triggerSingleLeptonMu",
-				     "triggerSingleLeptonEle","triggerSingleJet_mu","triggerSingleJet_ele",
-				     "triggerHT_mu","triggerHT_ele","triggerPFHT_mu","triggerPFHT_ele"};
-    book_histograms(ctx, histogram_tags);
-    h_RecoPlots_After_TstarTstar_tgtg.reset(new TstarTstarRecoTstarHists(ctx, "RecoPlots_After_TstarTstar_tgtg"));
-    h_RecoPlots_After_TstarTstar_tgtg_ttbarsemilep.reset(new TstarTstarRecoTstarHists(ctx, "RecoPlots_After_TstarTstar_tgtg_SemiLepTTBarMatch"));
+  h_bcorrections.reset(new TstarTstarHists(ctx, "bcorrections"));
+  h_bcorrections_mu.reset(new TstarTstarHists(ctx, "bcorrections_mu"));
+  h_bcorrections_mu_lowpt.reset(new TstarTstarHists(ctx, "bcorrections_mu_lowpt"));
+  h_bcorrections_mu_highpt.reset(new TstarTstarHists(ctx, "bcorrections_mu_highpt"));
+  h_bcorrections_ele.reset(new TstarTstarHists(ctx, "bcorrections_ele"));
+  h_bcorrections_ele_lowpt.reset(new TstarTstarHists(ctx, "bcorrections_ele_lowpt"));
+  h_bcorrections_ele_highpt.reset(new TstarTstarHists(ctx, "bcorrections_ele_highpt"));
 
-    // 5. Set up variables for ML
-    vector<string> vars = {"lepton_pt","lepton_eta","lepton_phi",
-			   "dR_ttbar","dR_gluon_toplep","dR_gluon_tophad","dR_tstartstar",
-			   "gluon_pt","gluon_eta","gluon_phi",
-			   "Tstarlep_pt","Tstarlep_eta","Tstarlep_phi",
-			   "Tstarhad_pt","Tstarhad_eta","Tstarhad_phi"};
-    book_TTreeVars(ctx, vars);
+  h_byield.reset(new TstarTstarHists(ctx, "byield"));
+  h_byield_mu.reset(new TstarTstarHists(ctx, "byield_mu"));
+  h_byield_mu_lowpt.reset(new TstarTstarHists(ctx, "byield_mu_lowpt"));
+  h_byield_mu_highpt.reset(new TstarTstarHists(ctx, "byield_mu_highpt"));
+  h_byield_ele.reset(new TstarTstarHists(ctx, "byield_ele"));
+  h_byield_ele_lowpt.reset(new TstarTstarHists(ctx, "byield_ele_lowpt"));
+  h_byield_ele_highpt.reset(new TstarTstarHists(ctx, "byield_ele_highpt"));
+
+  h_btagcut.reset(new TstarTstarHists(ctx, "btagcut"));
+  h_btagcut_mu.reset(new TstarTstarHists(ctx, "btagcut_mu"));
+  h_btagcut_mu_lowpt.reset(new TstarTstarHists(ctx, "btagcut_mu_lowpt"));
+  h_btagcut_mu_highpt.reset(new TstarTstarHists(ctx, "btagcut_mu_highpt"));
+  h_btagcut_ele.reset(new TstarTstarHists(ctx, "btagcut_ele"));
+  h_btagcut_ele_lowpt.reset(new TstarTstarHists(ctx, "btagcut_ele_lowpt"));
+  h_btagcut_ele_highpt.reset(new TstarTstarHists(ctx, "btagcut_ele_highpt"));
+
+  h_2Dcut.reset(new TstarTstarHists(ctx, "2Dcut"));
+  h_2Dcut_mu.reset(new TstarTstarHists(ctx, "2Dcut_mu"));
+  h_2Dcut_mu_lowpt.reset(new TstarTstarHists(ctx, "2Dcut_mu_lowpt"));
+  h_2Dcut_mu_highpt.reset(new TstarTstarHists(ctx, "2Dcut_mu_highpt"));
+  h_2Dcut_ele.reset(new TstarTstarHists(ctx, "2Dcut_ele"));
+  h_2Dcut_ele_lowpt.reset(new TstarTstarHists(ctx, "2Dcut_ele_lowpt"));
+  h_2Dcut_ele_highpt.reset(new TstarTstarHists(ctx, "2Dcut_ele_highpt"));
+
+  h_STcut.reset(new TstarTstarHists(ctx, "STcut"));
+  h_STcut_mu.reset(new TstarTstarHists(ctx, "STcut_mu"));
+  h_STcut_mu_lowpt.reset(new TstarTstarHists(ctx, "STcut_mu_lowpt"));
+  h_STcut_mu_highpt.reset(new TstarTstarHists(ctx, "STcut_mu_highpt"));
+  h_STcut_ele.reset(new TstarTstarHists(ctx, "STcut_ele"));
+  h_STcut_ele_lowpt.reset(new TstarTstarHists(ctx, "STcut_ele_lowpt"));
+  h_STcut_ele_highpt.reset(new TstarTstarHists(ctx, "STcut_ele_highpt"));
+
+  h_theorycorrections.reset(new TstarTstarHists(ctx, "theorycorrections"));
+  h_theorycorrections_mu.reset(new TstarTstarHists(ctx, "theorycorrections_mu"));
+  h_theorycorrections_mu_lowpt.reset(new TstarTstarHists(ctx, "theorycorrections_mu_lowpt"));
+  h_theorycorrections_mu_highpt.reset(new TstarTstarHists(ctx, "theorycorrections_mu_highpt"));
+  h_theorycorrections_ele.reset(new TstarTstarHists(ctx, "theorycorrections_ele"));
+  h_theorycorrections_ele_lowpt.reset(new TstarTstarHists(ctx, "theorycorrections_ele_lowpt"));
+  h_theorycorrections_ele_highpt.reset(new TstarTstarHists(ctx, "theorycorrections_ele_highpt"));
+  h_theorycorrections_ttbar.reset(new TstarTstarHists(ctx, "theorycorrections_ttbar"));
+  
+  h_nob_btagcut.reset(new TstarTstarHists(ctx, "nob_btagcut"));
+  h_nob_btagcut_mu.reset(new TstarTstarHists(ctx, "nob_btagcut_mu"));
+  h_nob_btagcut_mu_lowpt.reset(new TstarTstarHists(ctx, "nob_btagcut_lowpt"));
+  h_nob_btagcut_mu_highpt.reset(new TstarTstarHists(ctx, "nob_btagcut_mu_highpt"));
+  h_nob_btagcut_ele.reset(new TstarTstarHists(ctx, "nob_btagcut_ele"));
+  h_nob_btagcut_ele_lowpt.reset(new TstarTstarHists(ctx, "nob_btagcut_ele_lowpt"));
+  h_nob_btagcut_ele_highpt.reset(new TstarTstarHists(ctx, "nob_btagcut_ele_highpt"));
+
+  h_nob_2Dcut.reset(new TstarTstarHists(ctx, "nob_2Dcut"));
+  h_nob_2Dcut_mu.reset(new TstarTstarHists(ctx, "nob_2Dcut_mu"));
+  h_nob_2Dcut_mu_lowpt.reset(new TstarTstarHists(ctx, "nob_2Dcut_lowpt"));
+  h_nob_2Dcut_mu_highpt.reset(new TstarTstarHists(ctx, "nob_2Dcut_mu_highpt"));
+  h_nob_2Dcut_ele.reset(new TstarTstarHists(ctx, "nob_2Dcut_ele"));
+  h_nob_2Dcut_ele_lowpt.reset(new TstarTstarHists(ctx, "nob_2Dcut_ele_lowpt"));
+  h_nob_2Dcut_ele_highpt.reset(new TstarTstarHists(ctx, "nob_2Dcut_ele_highpt"));
+
+  h_nob_STcut.reset(new TstarTstarHists(ctx, "nob_STcut"));
+  h_nob_STcut_mu.reset(new TstarTstarHists(ctx, "nob_STcut_mu"));
+  h_nob_STcut_mu_lowpt.reset(new TstarTstarHists(ctx, "nob_STcut_lowpt"));
+  h_nob_STcut_mu_highpt.reset(new TstarTstarHists(ctx, "nob_STcut_mu_highpt"));
+  h_nob_STcut_ele.reset(new TstarTstarHists(ctx, "nob_STcut_ele"));
+  h_nob_STcut_ele_lowpt.reset(new TstarTstarHists(ctx, "nob_STcut_ele_lowpt"));
+  h_nob_STcut_ele_highpt.reset(new TstarTstarHists(ctx, "nob_STcut_ele_highpt"));
+
+  h_nob_theorycorrections.reset(new TstarTstarHists(ctx, "nob_theorycorrections"));
+  h_nob_theorycorrections_mu.reset(new TstarTstarHists(ctx, "nob_theorycorrections_mu"));
+  h_nob_theorycorrections_mu_lowpt.reset(new TstarTstarHists(ctx, "nob_theorycorrections_lowpt"));
+  h_nob_theorycorrections_mu_highpt.reset(new TstarTstarHists(ctx, "nob_theorycorrections_mu_highpt"));
+  h_nob_theorycorrections_ele.reset(new TstarTstarHists(ctx, "nob_theorycorrections_ele"));
+  h_nob_theorycorrections_ele_lowpt.reset(new TstarTstarHists(ctx, "nob_theorycorrections_ele_lowpt"));
+  h_nob_theorycorrections_ele_highpt.reset(new TstarTstarHists(ctx, "nob_theorycorrections_ele_highpt"));
+
+  // jet correction hists
+  h_jetCorr_beginSel.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_beginSel"));
+  h_jetCorr_prefiring.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_prefiring"));
+  h_jetCorr_jetcorrections.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_jetcorrections"));
+  h_jetCorr_jetcleaning.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_jetcleaning"));
+  h_jetCorr_theorycorrections.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_theorycorrections"));
+
+  h_jetCorr_beginSel_mu.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_beginSel_mu"));
+  h_jetCorr_prefiring_mu.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_prefiring_mu"));
+  h_jetCorr_jetcorrections_mu.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_jetcorrections_mu"));
+  h_jetCorr_jetcleaning_mu.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_jetcleaning_mu"));
+  h_jetCorr_theorycorrections_mu.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_theorycorrections_mu"));
+
+  h_jetCorr_beginSel_ele.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_beginSel_ele"));
+  h_jetCorr_prefiring_ele.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_prefiring_ele"));
+  h_jetCorr_jetcorrections_ele.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_jetcorrections_ele"));
+  h_jetCorr_jetcleaning_ele.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_jetcleaning_ele"));
+  h_jetCorr_theorycorrections_ele.reset(new TstarTstarJetCorrectionHists(ctx, "jetCorr_theorycorrections_ele"));
+
+  // ###### 4. Init Handles ######
+  h_trigger_decision = ctx.get_handle<bool>("trigger_decision");
+  h_is_muevt = ctx.get_handle<bool>("is_muevt");
+  h_is_highpt = ctx.get_handle<bool>("is_highpt");
+  h_evt_weight = ctx.get_handle<double>("evt_weight");
+  h_primlep = ctx.get_handle<FlavorParticle>("PrimaryLepton");
+  h_MC_isfake2017B = ctx.get_handle<bool>("MC_isfake2017B");
+  h_MC_isfake2016B = ctx.get_handle<bool>("MC_isfake2016B");
+
+  h_ST_AK4 = ctx.declare_event_output<double>("ST_AK4");
+  h_ST_HOTVR = ctx.declare_event_output<double>("ST_HOTVR");
+  h_is_btagevent = ctx.declare_event_output<bool>("is_btagevent");
+  h_is_ttbarCR = ctx.declare_event_output<bool>("is_ttbarCR");
+
 }
 
 
 bool TstarTstarSelectionModule::process(Event & event) {
 
-  event.set(h_is_ttbar_reconstructed, false);
-  event.set(h_recohyp, ReconstructionHypothesis());
-  event.set(h_recohyp_tstartstar,ReconstructionTstarHypothesis());
+  // debug status message
+  if(debug) cout << "TstarTstarSelectionModule: Starting to process event (runid, eventid) = (" << event.run << ", " << event.event << "); weight = " << event.weight << endl;
+
+  if(debug && event.get(h_MC_isfake2017B)) cout << "This MC event was randomly assigned to 2017 Run B handling" << endl;
+  if(debug && event.get(h_is_highpt)) cout << "The event is classified as having high pt" << std::endl;
+
+  // reapply event weights from handle
+  event.weight = event.get(h_evt_weight);
+  if(debug) cout << "weights applied." << endl;
+
+  // Fill ttgen object for correct matching check, etc
+  if(is_MC) ttgenprod->process(event);
+  if(debug) std::cout << "Filled ttgenprod" << endl;
+
+  // set primary lepton
+  reco_primlep->process(event);
+  if(debug) std::cout << "Got primary lepton" << endl;
+
+  // hists before anything happened
+  if(debug) std::cout << "Fill Crosscheck hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    h_beginSel->fill(event);
+    if(is_MC) h_jetCorr_beginSel->fill(event);
+    if(event.get(h_is_muevt)){
+      h_beginSel_mu->fill(event);
+      if(is_MC) h_jetCorr_beginSel_mu->fill(event);
+      if(event.get(h_is_highpt)) h_beginSel_mu_highpt->fill(event);
+      else h_beginSel_mu_lowpt->fill(event);
+    } else {
+      h_beginSel_ele->fill(event);
+      if(is_MC) h_jetCorr_beginSel_ele->fill(event);
+      if(event.get(h_is_highpt)) h_beginSel_ele_highpt->fill(event);
+      else h_beginSel_ele_lowpt->fill(event);
+    }
+  }
+
+  // Prefiring weights
+  if (is_MC) {
+     if (Prefiring_direction == "nominal") event.weight *= event.prefiringWeight;
+     else if (Prefiring_direction == "up") event.weight *= event.prefiringWeightUp;
+     else if (Prefiring_direction == "down") event.weight *= event.prefiringWeightDown;
+  }
+  // writing MC weights
+  MCScaleVariations->process(event);
+
+  // hists before anything happened
+  if(debug) std::cout << "Fill Crosscheck hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    h_prefiring->fill(event);
+    if(is_MC) h_jetCorr_prefiring->fill(event);
+    if(event.get(h_is_muevt)){
+      h_prefiring_mu->fill(event);
+      if(is_MC) h_jetCorr_prefiring_mu->fill(event);
+      if(event.get(h_is_highpt)) h_prefiring_mu_highpt->fill(event);
+      else h_prefiring_mu_lowpt->fill(event);
+    } else {
+      h_prefiring_ele->fill(event);
+      if(is_MC) h_jetCorr_prefiring_ele->fill(event);
+      if(event.get(h_is_highpt)) h_prefiring_ele_highpt->fill(event);
+      else h_prefiring_ele_lowpt->fill(event);
+    }
+  }
   
-  if(debug)   
-    cout << "TstarTstarSelectionModule: Starting to process event (runid, eventid) = (" << event.run << ", " << event.event << "); weight = " << event.weight << endl;
-  LumiWeight_module->process(event);
-  const bool pass_ttbarsemilep = TTbarSemiLepMatchable_selection->passes(event);
-  fill_histograms(event, "PreSelection", pass_ttbarsemilep);
-  if(event.muons->size() == 1) fill_histograms(event, "PreSelection_mu", pass_ttbarsemilep);
-  if(event.electrons->size() == 1) fill_histograms(event, "PreSelection_ele", pass_ttbarsemilep);
- if(debug)   
-   cout << "pass_ttbarsemilep" <<endl;
- if(event.jets->size()<1) return false;//FixMe: why this is happening?
+  // JetMET corrections (and jet lepton cleaning)
+  if(!jetcorrections->process(event)) return false;
+  if(!(HOTVRjlc->process(event))) return false;
+  if(!(HOTVRCorr->process(event))) return false;
 
-
- bool pass_ak8 = topjet_selection->passes(event);
- if(!pass_ak8) return false;
-
- fill_histograms(event, "AK8sel", pass_ttbarsemilep);
- if(event.muons->size() == 1) fill_histograms(event, "AK8sel_mu", pass_ttbarsemilep);
- if(event.electrons->size() == 1) fill_histograms(event, "AK8sel_ele", pass_ttbarsemilep);
-
-
- bool pass_MET =  met_sel->passes(event);
- if(!pass_MET) return false;
-
- fill_histograms(event, "MET", pass_ttbarsemilep);
- if(event.muons->size() == 1) fill_histograms(event, "MET_mu", pass_ttbarsemilep);
- if(event.electrons->size() == 1) fill_histograms(event, "MET_ele", pass_ttbarsemilep);
-
- bool pass_ST =  st_sel->passes(event);
- if(!pass_ST) return false;
- fill_histograms(event, "ST", pass_ttbarsemilep);
- if(event.muons->size() == 1) fill_histograms(event, "ST_mu", pass_ttbarsemilep);
- if(event.electrons->size() == 1) fill_histograms(event, "ST_ele", pass_ttbarsemilep);
-
- //Fill ttgen object for correct matching check, etc
-  ttgenprod->process(event);
-
-  bool pass_trigger_SingleJet = (triggerSingleJet450_sel->passes(event) && event.jets->at(0).pt()>500);
-  if(pass_trigger_SingleJet){
-    if(event.muons->size() == 1) fill_histograms(event, "triggerSingleJet_mu", pass_ttbarsemilep);
-    if(event.electrons->size() == 1) fill_histograms(event, "triggerSingleJet_ele", pass_ttbarsemilep);
-  }
- if(debug)   
-   cout << "pass_trigger_SingleJet" <<endl;
-
-  bool pass_trigger_SingleMu = (triggerSingleLeptonMu1_sel->passes(event) || triggerSingleLeptonMu2_sel->passes(event) 
-				|| triggerSingleLeptonMu3_sel->passes(event) || triggerSingleLeptonMu4_sel->passes(event));
-
-  if(pass_trigger_SingleMu){
-    if((event.muons->size() == 1) && (event.muons->at(0).pt()>60))
-      fill_histograms(event, "triggerSingleLeptonMu", pass_ttbarsemilep); //FixMe: each Muon trigger should have its own threshold
-  }
- if(debug)   
-   cout << "pass_trigger_SingleMu" <<endl;
-
- bool pass_trigger_SingleEle = (triggerSingleLeptonEle1_sel->passes(event) || triggerSingleLeptonEle2_sel->passes(event) || triggerSingleLeptonEle3_sel->passes(event));
- if(pass_trigger_SingleEle){
-   if((event.electrons->size() == 1) && (event.electrons->at(0).pt()>120)) 
-     fill_histograms(event, "triggerSingleLeptonEle", pass_ttbarsemilep); //FixMe: each Electron trigger should have its own threshold
- }
- if(debug)   
-   cout << "pass_trigger_SingleEle" <<endl;
-
- double st_jets = 0.;
- std::vector<Jet>* jets = event.jets;
- for(const auto & jet : *jets) st_jets += jet.pt();
-
- bool pass_trigegr_HT = (triggerHT1_sel->passes(event) || triggerHT2_sel->passes(event) || triggerHT3_sel->passes(event) 
-    || triggerHT4_sel->passes(event) || triggerHT5_sel->passes(event) || triggerHT6_sel->passes(event));
-  if(pass_trigegr_HT){
-    if((event.muons->size() == 1) && st_jets>650) fill_histograms(event, "triggerHT_mu", pass_ttbarsemilep); //FixME: each HT trigger should have different st_jets threshold
-    if((event.electrons->size() == 1) && st_jets>650) fill_histograms(event, "triggerHT_ele", pass_ttbarsemilep);
-  }
- if(debug)   
-   cout << "pass_trigegr_HT" <<endl;
-
-  bool pass_trigegr_PFHT = triggerPFHT_sel->passes(event);
-  if(pass_trigegr_PFHT){
-    if((event.muons->size() == 1) && st_jets>900) fill_histograms(event, "triggerPFHT_mu", pass_ttbarsemilep); //FixME: PFHT trigger might have different st_jets threshold
-    if((event.electrons->size() == 1) && st_jets>900) fill_histograms(event, "triggerPFHT_ele", pass_ttbarsemilep);
-  }
- if(debug)   
-   cout << "pass_trigegr_PFHT"<<endl;
-
-
-  reco_primlep->process(event);//set "primary lepton"
-  if(debug) {cout << "Starting ttbar reconstruction... ";}\
-  ttbar_reco->process(event);//reconstruct ttbar
-  ttbar_CorrectMatchDiscriminator->process(event);//find matched to ttbar gen hypothesis
-  if(debug) {cout << "Finished. Finding best Hypothesis..."<< endl;}   
-  ttbar_discriminator->process(event);
-
-  //make sure we fill all values with smth
-  for(unsigned int iname = 0; iname<h_MLinput_names.size(); iname++)
-    event.set(h_MLinput_values[iname],0);
-
-  ReconstructionHypothesis hyp = event.get(h_recohyp);  
-  if(debug) {cout << "Start TstarTstar reconstruction ..."<< endl;}
-  bool pass_tgluon_tgluon_reco = false;
-  if(event.get(h_is_ttbar_reconstructed)){
-    if(is_tgtgamma){ // Tstar+Tstar -> t+g + t+gamma //FixME: the code is broken and most probably won't work. Sorry!
-      cout<<"Nothing is done for tgtgamma at the moment"<<endl;
+  // hists after jet corrections
+  if(debug) std::cout << "Fill correction hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    h_jetcorrections->fill(event);
+    if(is_MC) h_jetCorr_jetcorrections->fill(event);
+    if(event.get(h_is_muevt)){
+      h_jetcorrections_mu->fill(event);
+      if(is_MC) h_jetCorr_jetcorrections_mu->fill(event);
+      if(event.get(h_is_highpt)) h_jetcorrections_mu_highpt->fill(event);
+      else h_jetcorrections_mu_lowpt->fill(event);
+    } else {
+      h_jetcorrections_ele->fill(event);
+      if(is_MC) h_jetCorr_jetcorrections_ele->fill(event);
+      if(event.get(h_is_highpt)) h_jetcorrections_ele_highpt->fill(event);
+      else h_jetcorrections_ele_lowpt->fill(event);
     }
-    if(is_tgtg){ // Tstar+Tstar -> t+g + t+g
-      pass_tgluon_tgluon_reco = TstarTstar_tgluon_tgluon_reco->process(event);
-      if(pass_tgluon_tgluon_reco){
-	h_RecoPlots_After_TstarTstar_tgtg->fill(event);
-	fill_MLinput(event);
+  }
+
+  // Jet cleaning
+  if(!(AK4cleaner->process(event))) return false;
+  if(!(HOTVRcleaner->process(event))) return false;
+
+  // st calculation, for usage in plotting later on
+  double st = 0.;
+  for(const auto & lepton : *event.electrons) st += lepton.pt();
+  for(const auto & lepton : *event.muons) st += lepton.pt();
+  st += event.met->pt();
+  double stHOTVR = st;
+
+  for(const auto & jet : *event.jets) st += jet.pt();
+  for(const auto & jet : *event.topjets) stHOTVR += jet.pt();
+
+  event.set(h_ST_AK4, st);
+  event.set(h_ST_HOTVR, stHOTVR);
+
+  // hists after jet cleaning
+  if(debug) std::cout << "Fill jet cleaning hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    h_jetcleaning->fill(event);
+    if(is_MC) h_jetCorr_jetcleaning->fill(event);
+    if(event.get(h_is_muevt)){
+      h_jetcleaning_mu->fill(event);
+      if(is_MC) h_jetCorr_jetcleaning_mu->fill(event);
+      if(event.get(h_is_highpt)) h_jetcleaning_mu_highpt->fill(event);
+      else h_jetcleaning_mu_lowpt->fill(event);
+    } else {
+      h_jetcleaning_ele->fill(event);
+      if(is_MC) h_jetCorr_jetcleaning_ele->fill(event);
+      if(event.get(h_is_highpt)) h_jetcleaning_ele_highpt->fill(event);
+      else h_jetcleaning_ele_lowpt->fill(event);
+    }
+  }
+
+  // trigger SFs
+  // these are only applied if the event is triggered!
+  if(debug) std::cout << "before muon trigger SFs" << std::endl;
+  if(is_MC && event.get(h_is_muevt) && !isTriggerSFMeasurement && event.get(h_trigger_decision)){
+    if(event.get(h_is_highpt)) sf_muon_trigger_highpt->process(event);
+    else sf_muon_trigger_lowpt->process(event);
+  } else {
+    sf_muon_trigger_DUMMY->process(event);
+  }
+  if(debug) std::cout << "before electron trigger SFs" << std::endl;
+  if(!isTriggerSFMeasurement) sf_ele_trigger->process(event); // this one is its own dummy!
+
+  // hists after triggerSFs
+  if(debug) std::cout << "Fill triggerSF hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    h_triggerSF->fill(event);
+    if(event.get(h_is_muevt)){
+      h_triggerSF_mu->fill(event);
+      if(event.get(h_is_highpt)) h_triggerSF_mu_highpt->fill(event);
+      else h_triggerSF_mu_lowpt->fill(event);
+    } else {
+      h_triggerSF_ele->fill(event);
+      if(event.get(h_is_highpt)) h_triggerSF_ele_highpt->fill(event);
+      else h_triggerSF_ele_lowpt->fill(event);
+    }
+  }
+
+  // lepton SFs
+  if(event.get(h_is_muevt)){
+
+    if(event.get(h_is_highpt)) {
+      sf_muon_ID_highpt->process(event);
+      sf_muon_iso_DUMMY->process(event);
+    } else {
+      sf_muon_ID_lowpt->process(event);
+      sf_muon_iso->process(event);
+    }
+
+    if(isTriggerSFMeasurement) {
+      sf_ele_reco->process(event);
+
+      if(event.electrons->at(0).pt() > 120) {
+        sf_ele_ID_highpt->process(event);
+      } else {
+        sf_ele_ID_lowpt->process(event);
       }
-      if(pass_tgluon_tgluon_reco && pass_ttbarsemilep) 
-	h_RecoPlots_After_TstarTstar_tgtg_ttbarsemilep->fill(event);
+    } else {
+      sf_ele_reco_DUMMY->process(event);
+      sf_ele_ID_DUMMY->process(event);
     }
-    // void TstarTstarSelectionModule::fill_TTreeVars(string var_name, float var_value){ 
+
+  } else {
+
+    sf_ele_reco->process(event);
+
+    if(event.get(h_is_highpt)) {
+      sf_ele_ID_highpt->process(event);
+    } else {
+      sf_ele_ID_lowpt->process(event);
+    }
+
+    sf_muon_ID_DUMMY->process(event);
+    sf_muon_iso_DUMMY->process(event);
+
   }
-  else{
-    if(debug){cout << "Event has no best hypothesis!" << endl;}
+  if(debug) std::cout << "Done Lepton ID, ISO SFs" << endl;
+
+  // hists after lepton SFs
+  if(debug) std::cout << "Fill lepton SF hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    h_leptonSF->fill(event);
+    if(event.get(h_is_muevt)){
+      h_leptonSF_mu->fill(event);
+      if(event.get(h_is_highpt)) h_leptonSF_mu_highpt->fill(event);
+      else h_leptonSF_mu_lowpt->fill(event);
+    } else {
+      h_leptonSF_ele->fill(event);
+      if(event.get(h_is_highpt)) h_leptonSF_ele_highpt->fill(event);
+      else h_leptonSF_ele_lowpt->fill(event);
+    }
   }
 
-  event.set(h_weight,event.weight);
-  //  return true;
-  return pass_tgluon_tgluon_reco;//store only events, which pass tgtg reconstruction
+  // exclude electron in overlap region
+  if(!event.get(h_is_muevt) || isTriggerSFMeasurement) {
+    if( (abs(event.electrons->at(0).eta()) >= 1.444) && (abs(event.electrons->at(0).eta()) <= 1.566)) return false;
+  }
+
+  // Fixing the HEM issue (only 2018)
+  if(!HEMCleaner->passes(event)) return false;
+  if(is_MC && (year == "2018" || year == "UL18")) HEMCleanerMCScaler->process(event);
+
+  // hists after HEM & lepton overlap removal
+  if(debug) std::cout << "Fill HEM hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    h_HEMcut->fill(event);
+    if(event.get(h_is_muevt)){
+      h_HEMcut_mu->fill(event);
+      if(event.get(h_is_highpt)) h_HEMcut_mu_highpt->fill(event);
+      else h_HEMcut_mu_lowpt->fill(event);
+    } else {
+      h_HEMcut_ele->fill(event);
+      if(event.get(h_is_highpt)) h_HEMcut_ele_highpt->fill(event);
+      else h_HEMcut_ele_lowpt->fill(event);
+    }
+  }
+
+
+  // MET selection
+  bool pass_MET = met_sel->passes(event);
+  if(!pass_MET) return false;
+
+  // hists after MET cut
+  if(debug) std::cout << "Fill MET cut hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    h_METcut->fill(event);
+    if(event.get(h_is_muevt)){
+      h_METcut_mu->fill(event);
+      if(event.get(h_is_highpt)) h_METcut_mu_highpt->fill(event);
+      else h_METcut_mu_lowpt->fill(event);
+    } else {
+      h_METcut_ele->fill(event);
+      if(event.get(h_is_highpt)) h_METcut_ele_highpt->fill(event);
+      else h_METcut_ele_lowpt->fill(event);
+    }
+  }
+
+
+  // AK4 jet selection
+  bool pass_njet = (event.jets->size()>3);
+  if(isTriggerSFMeasurement) pass_njet = (event.jets->size()>1); // only need to require 2 jets for trigger SF measurement
+  if(!pass_njet) return false;
+
+  // hists after AK4 cut
+  if(debug) std::cout << "Fill AK4 cut hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    h_AK4cut->fill(event);
+    if(event.get(h_is_muevt)){
+      h_AK4cut_mu->fill(event);
+      if(event.get(h_is_highpt)) h_AK4cut_mu_highpt->fill(event);
+      else h_AK4cut_mu_lowpt->fill(event);
+    } else {
+      h_AK4cut_ele->fill(event);
+      if(event.get(h_is_highpt)) h_AK4cut_ele_highpt->fill(event);
+      else h_AK4cut_ele_lowpt->fill(event);
+    }
+  }
+
+
+  // ###### HOTVR jet selection ######
+  bool pass_fat_njet = (event.topjets->size()>0);
+  if(!pass_fat_njet && !isTriggerSFMeasurement) return false;
+
+  // hists after HOTVR cut
+  if(debug) std::cout << "Fill HOTVR cut hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    h_HOTVRcut->fill(event);
+    if(event.get(h_is_muevt)){
+      h_HOTVRcut_mu->fill(event);
+      if(event.get(h_is_highpt)) h_HOTVRcut_mu_highpt->fill(event);
+      else h_HOTVRcut_mu_lowpt->fill(event);
+    } else {
+      h_HOTVRcut_ele->fill(event);
+      if(event.get(h_is_highpt)) h_HOTVRcut_ele_highpt->fill(event);
+      else h_HOTVRcut_ele_lowpt->fill(event);
+    }
+  }
+
+
+  // b-tagging sfs
+  ScaleFactor_btagging->process(event);
+
+  // hists after b-tagging SFs
+  if(debug) std::cout << "Fill btagging SF hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    h_bcorrections->fill(event);
+    if(event.get(h_is_muevt)){
+      h_bcorrections_mu->fill(event);
+      if(event.get(h_is_highpt)) h_bcorrections_mu_highpt->fill(event);
+      else h_bcorrections_mu_lowpt->fill(event);
+    } else {
+      h_bcorrections_ele->fill(event);
+      if(event.get(h_is_highpt)) h_bcorrections_ele_highpt->fill(event);
+      else h_bcorrections_ele_lowpt->fill(event);
+    }
+  }
+
+  // b-tagging yield correction
+  // done as a function of AK4 HT and N(AK4)
+  if(is_MC) {
+    double ht = 0.;
+    for(const auto & jet : *event.jets) ht += jet.pt();
+    if(ht >= 4000.) ht = 3999.9;
+
+    double btaggingYieldWeight = eventYieldFactors->GetBinContent( eventYieldFactors->GetXaxis()->FindBin(ht),  eventYieldFactors->GetYaxis()->FindBin(event.jets->size()) );
+    event.weight *= btaggingYieldWeight;
+  }
+
+  // defining a ttbar CR, now that btags have been corrected
+  TopJetId topjetID = AndId<TopJet>(HOTVRTopTag(), Tau32Groomed(0.56)); // Top Tag that is used later
+  bool passHOTVRtoptag = false;
+  for (const auto & jet: *event.topjets){
+    if(topjetID(jet, event)) passHOTVRtoptag = true;
+  }
+  BTag bJetID_loose = BTag(BTag::algo::DEEPJET, BTag::wp::WP_LOOSE);
+  int N_btag_loose = 0;
+  for (const auto & jet: *event.jets){
+    if(bJetID_loose(jet, event)) N_btag_loose++;
+  }
+  if(passHOTVRtoptag && N_btag_loose > 1) event.set(h_is_ttbarCR, true);
+  else event.set(h_is_ttbarCR, false);
+
+  // hists after b-tagging yield corrections
+  if(debug) std::cout << "Fill btagging yield hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    h_byield->fill(event);
+    if(event.get(h_is_muevt)){
+      h_byield_mu->fill(event);
+      if(event.get(h_is_highpt)) h_byield_mu_highpt->fill(event);
+      else h_byield_mu_lowpt->fill(event);
+    } else {
+      h_byield_ele->fill(event);
+      if(event.get(h_is_highpt)) h_byield_ele_highpt->fill(event);
+      else h_byield_ele_lowpt->fill(event);
+    }
+  }
+
+
+  // btag selection
+  BTag bJetID = BTag(BTag::algo::DEEPJET, BTag::wp::WP_MEDIUM);
+  bool pass_btagcut = false;
+  for (const auto & jet: *event.jets){
+    if(bJetID(jet, event)) pass_btagcut = true;
+  }
+  event.set(h_is_btagevent, pass_btagcut); // not throwing events away, as we'll keep these for iur
+
+  // hists after b-tagging cut
+  if(debug) std::cout << "Fill btagging cut hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    if(event.get(h_is_btagevent)) {
+      h_btagcut->fill(event);
+      if(event.get(h_is_muevt)){
+        h_btagcut_mu->fill(event);
+        if(event.get(h_is_highpt)) h_btagcut_mu_highpt->fill(event);
+        else h_btagcut_mu_lowpt->fill(event);
+      } else {
+        h_btagcut_ele->fill(event);
+        if(event.get(h_is_highpt)) h_btagcut_ele_highpt->fill(event);
+        else h_btagcut_ele_lowpt->fill(event);
+      }
+    } else {
+      h_nob_btagcut->fill(event);
+      if(event.get(h_is_muevt)){
+        h_nob_btagcut_mu->fill(event);
+        if(event.get(h_is_highpt)) h_nob_btagcut_mu_highpt->fill(event);
+        else h_nob_btagcut_mu_lowpt->fill(event);
+      } else {
+        h_nob_btagcut_ele->fill(event);
+        if(event.get(h_is_highpt)) h_nob_btagcut_ele_highpt->fill(event);
+        else h_nob_btagcut_ele_lowpt->fill(event);
+      }
+    }
+  }
+
+
+  // lepton-jet 2D cut
+  if(debug) std::cout << "Start 2D cut" << endl;
+  bool pass_2D = true;
+  for(auto& muo : *event.muons){
+    if(debug) cout<<"AFTER Muon (pt,eta): "<<muo.pt()<<", "<<muo.eta()<<endl;
+    float    dRmin, pTrel;
+    std::tie(dRmin, pTrel) = drmin_pTrel(muo, *event.jets);
+    muo.set_tag(Muon::twodcut_dRmin, dRmin);
+    muo.set_tag(Muon::twodcut_pTrel, pTrel);
+  }
+  for(auto& ele : *event.electrons){
+    if(debug) cout<<"Electron (pt,eta): "<<ele.pt()<<", "<<ele.eta()<<endl;
+    float    dRmin, pTrel;
+    std::tie(dRmin, pTrel) = drmin_pTrel(ele, *event.jets);
+    ele.set_tag(Electron::twodcut_dRmin, dRmin);
+    ele.set_tag(Electron::twodcut_pTrel, pTrel);
+  }
+  const bool pass_twodcut = twodcut_sel->passes(event);
+  if(event.get(h_is_highpt)) pass_2D = pass_twodcut;
+  if(!pass_2D) return false;
+
+  // hists after 2D cut
+  if(debug) std::cout << "Fill 2D cut hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    if(event.get(h_is_btagevent)) {
+      h_2Dcut->fill(event);
+      if(event.get(h_is_muevt)){
+        h_2Dcut_mu->fill(event);
+        if(event.get(h_is_highpt)) h_2Dcut_mu_highpt->fill(event);
+        else h_2Dcut_mu_lowpt->fill(event);
+      } else {
+        h_2Dcut_ele->fill(event);
+        if(event.get(h_is_highpt)) h_2Dcut_ele_highpt->fill(event);
+        else h_2Dcut_ele_lowpt->fill(event);
+      }
+    } else {
+      h_nob_2Dcut->fill(event);
+      if(event.get(h_is_muevt)){
+        h_nob_2Dcut_mu->fill(event);
+        if(event.get(h_is_highpt)) h_nob_2Dcut_mu_highpt->fill(event);
+        else h_nob_2Dcut_mu_lowpt->fill(event);
+      } else {
+        h_nob_2Dcut_ele->fill(event);
+        if(event.get(h_is_highpt)) h_nob_2Dcut_ele_highpt->fill(event);
+        else h_nob_2Dcut_ele_lowpt->fill(event);
+      }
+    }
+  }
+
+
+  // st cut
+  if(stHOTVR < 500 && !isTriggerSFMeasurement) return false;
+
+  // hists after ST cut
+  if(debug) std::cout << "Fill ST cut hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    if(event.get(h_is_btagevent)) {
+      h_STcut->fill(event);
+      if(event.get(h_is_muevt)){
+        h_STcut_mu->fill(event);
+        if(event.get(h_is_highpt)) h_STcut_mu_highpt->fill(event);
+        else h_STcut_mu_lowpt->fill(event);
+      } else {
+        h_STcut_ele->fill(event);
+        if(event.get(h_is_highpt)) h_STcut_ele_highpt->fill(event);
+        else h_STcut_ele_lowpt->fill(event);
+      }
+    } else {
+      h_nob_STcut->fill(event);
+      if(event.get(h_is_muevt)){
+        h_nob_STcut_mu->fill(event);
+        if(event.get(h_is_highpt)) h_nob_STcut_mu_highpt->fill(event);
+        else h_nob_STcut_mu_lowpt->fill(event);
+      } else {
+        h_nob_STcut_ele->fill(event);
+        if(event.get(h_is_highpt)) h_nob_STcut_ele_highpt->fill(event);
+        else h_nob_STcut_ele_lowpt->fill(event);
+      }
+    }
+  }
+
+
+  // NNLO corrections
+  ScaleFactor_NNLO->process(event);
+  TopPtReweighting->process(event); // is not applied, but calculated
+
+  // hists after theory corrections
+  if(debug) std::cout << "Fill theory correction hists" << endl;
+  if(event.get(h_trigger_decision)) {
+    if(event.get(h_is_btagevent)) {
+      h_theorycorrections->fill(event);
+      if(is_MC) h_jetCorr_theorycorrections->fill(event);
+      if(event.get(h_is_ttbarCR)) {h_theorycorrections_ttbar->fill(event);}
+      if(event.get(h_is_muevt)){
+        h_theorycorrections_mu->fill(event);
+        if(is_MC) h_jetCorr_theorycorrections_mu->fill(event);
+        if(event.get(h_is_highpt)) h_theorycorrections_mu_highpt->fill(event);
+        else h_theorycorrections_mu_lowpt->fill(event);
+      } else {
+        h_theorycorrections_ele->fill(event);
+        if(is_MC) h_jetCorr_theorycorrections_ele->fill(event);
+        if(event.get(h_is_highpt)) h_theorycorrections_ele_highpt->fill(event);
+        else h_theorycorrections_ele_lowpt->fill(event);
+      }
+    } else {
+      h_nob_theorycorrections->fill(event);
+      if(event.get(h_is_muevt)){
+        h_nob_theorycorrections_mu->fill(event);
+        if(event.get(h_is_highpt)) h_nob_theorycorrections_mu_highpt->fill(event);
+        else h_nob_theorycorrections_mu_lowpt->fill(event);
+      } else {
+        h_nob_theorycorrections_ele->fill(event);
+        if(event.get(h_is_highpt)) h_nob_theorycorrections_ele_highpt->fill(event);
+        else h_nob_theorycorrections_ele_lowpt->fill(event);
+      }
+    }
+  }
+
+  // save final weight for outputting later
+  event.set(h_evt_weight, event.weight);
+  return true;
+
 }
 
 // as we want to run the ExampleCycleNew directly with AnalysisModuleRunner,
 // make sure the TstarTstarSelectionModule is found by class name. This is ensured by this macro:
 UHH2_REGISTER_ANALYSIS_MODULE(TstarTstarSelectionModule)
 
-//}
+}

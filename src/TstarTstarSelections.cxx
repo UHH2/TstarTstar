@@ -245,22 +245,28 @@ bool TTbarSemiLepMatchableSelection::passes(const Event & event){
 std::pair<bool,double> TTbarSemiLepMatchableSelection::check_reco(const ReconstructionHypothesis hyp){
 
   //Following check with matching to GEN particles as described in AN2015-107 (Z' with 2015 data)
-  //Hadronic top
+  /**
+  //Hadronic top V1
   bool tophad_match = false;
   double dR_Wd1_min = 1e6;
   double dR_Wd2_min = 1e6;
   double dR_bhad_min = 1e6;
+  double dR_other_tophadjets = 0; // to prevent this from strongly favouring hypopthesises with way to many jets, calculate dR for each "false" jet and add that to result.
   if(!hyp.tophad_topjet_ptr()){//hadronic top reconstructed as set of AK4 jets
-    //    cout<<"Check AK4 jets for hadronic top"<<endl;
     for (uint i = 0; i < hyp.tophad_jets().size(); i++){
+      bool merged = false;
       double dR_Wd1 = deltaR(hyp.tophad_jets().at(i).v4(), Whadd1.v4());
       double dR_Wd2 = deltaR(hyp.tophad_jets().at(i).v4(), Whadd2.v4());
       double dR_bhad = deltaR(hyp.tophad_jets().at(i).v4(), bhad.v4());
-      if(dR_Wd1_min>dR_Wd1) dR_Wd1_min = dR_Wd1;
-      if(dR_Wd2_min>dR_Wd2) dR_Wd2_min = dR_Wd2;
-      if(dR_bhad_min>dR_bhad) dR_bhad_min = dR_bhad;
+      double min_dR_tmp = 1e6;
+      if(dR_Wd1_min>dR_Wd1) { min_dR_tmp = min(min_dR_tmp, dR_Wd1_min); dR_Wd1_min = dR_Wd1; merged = true;}
+      if(dR_Wd2_min>dR_Wd2) { min_dR_tmp = min(min_dR_tmp, dR_Wd2_min); dR_Wd2_min = dR_Wd2; merged = true;}
+      if(dR_bhad_min>dR_bhad) { min_dR_tmp = min(min_dR_tmp, dR_bhad_min); dR_bhad_min = dR_bhad; merged = true;}
+      if(merged && (min_dR_tmp < 1e6)){dR_other_tophadjets += min_dR_tmp;} // This is still wrong. Now something can be merged for two jets, be replaced for one and be counted twice!
+      else{dR_other_tophadjets += min({dR_Wd1, dR_Wd2, dR_bhad});}
     }
     if(dR_Wd1_min<0.4 && dR_Wd2_min<0.4 && dR_bhad_min<0.4) tophad_match = true;
+
   }
   else{//hadronic top reconstructed as AK8 jet
     dR_Wd1_min = deltaR(hyp.tophad_topjet_ptr()->v4(), Whadd1.v4());
@@ -268,20 +274,56 @@ std::pair<bool,double> TTbarSemiLepMatchableSelection::check_reco(const Reconstr
     dR_bhad_min = deltaR(hyp.tophad_topjet_ptr()->v4(), bhad.v4());
     if(dR_Wd1_min<0.8 && dR_Wd2_min<0.8 && dR_bhad_min<0.8) tophad_match = true;
   }
+  **/
+
+  //Hadronic top V2
+  bool tophad_match = false;
+  double dR_hadtop = 0.;
+  if(!hyp.tophad_topjet_ptr()){ //hadronic top reconstructed as set of AK4 jets
+    bool Wd1_merged = false;
+    bool Wd2_merged = false;
+    bool bhad_merged = false;
+    for (uint i = 0; i < hyp.tophad_jets().size(); i++){
+      double dR_Wd1 = deltaR(hyp.tophad_jets().at(i).v4(), Whadd1.v4());
+      double dR_Wd2 = deltaR(hyp.tophad_jets().at(i).v4(), Whadd2.v4());
+      double dR_bhad = deltaR(hyp.tophad_jets().at(i).v4(), bhad.v4());
+      if(dR_Wd1 < 0.4){Wd1_merged = true;}
+      if(dR_Wd2 < 0.4){Wd2_merged = true;}
+      if(dR_bhad < 0.4){bhad_merged = true;}
+ 
+      dR_hadtop += min({dR_Wd1, dR_Wd2, dR_bhad});
+    }
+    if(Wd1_merged && Wd2_merged && bhad_merged) tophad_match = true;
+
+  }
+  else{ //hadronic top reconstructed as AK8 jet
+    double dR_Wd1_min = 1e6;
+    double dR_Wd2_min = 1e6;
+    double dR_bhad_min = 1e6;
+    dR_Wd1_min = deltaR(hyp.tophad_topjet_ptr()->v4(), Whadd1.v4());
+    dR_Wd2_min = deltaR(hyp.tophad_topjet_ptr()->v4(), Whadd2.v4());
+    dR_bhad_min = deltaR(hyp.tophad_topjet_ptr()->v4(), bhad.v4());
+    if(dR_Wd1_min<0.8 && dR_Wd2_min<0.8 && dR_bhad_min<0.8) tophad_match = true;
+    dR_hadtop = dR_Wd1_min + dR_Wd2_min + dR_bhad_min;
+  }
 
   //Leptonic top
   bool toplep_match = false;
   double dR_lep = deltaR(lepton.v4(),hyp.lepton().v4());
   double dR_neutrino = deltaR(neutrino.v4(),hyp.neutrino_v4());
-  double dPhi_neutrino = deltaPhi(neutrino.v4(),hyp.neutrino_v4());
+  double dPhi_neutrino = deltaPhi(neutrino.v4(),hyp.neutrino_v4());  // for some reason we use dphi here, not dR. Why?
   double dR_blep_min = 1e6;
-  for (uint i = 0; i < hyp.toplep_jets().size(); i++){
+  double dR_other_toplepjets = 0;
+  for (uint i = 0; i < hyp.toplep_jets().size(); i++){ // look into # of used jets here.
     double dR_blep = deltaR(hyp.toplep_jets().at(i).v4(), blep.v4());
-    if(dR_blep_min>dR_blep) dR_blep_min=dR_blep;
+    if(dR_blep_min>dR_blep){
+      if(dR_blep_min < 1e6){dR_other_toplepjets += dR_blep_min;}
+      dR_blep_min=dR_blep;
+    }
+    else{dR_other_toplepjets += dR_blep;}
   }
-
   if(dR_blep_min<0.4 && dR_lep<0.1 && dPhi_neutrino<0.3) toplep_match = true;
-
+  
   double deltaM_lep = fabs(hyp.toplep_v4().M()-tlep.v4().M())/tlep.v4().M();
   double deltaM_had = fabs(hyp.tophad_v4().M()-thad.v4().M())/thad.v4().M();
   // cout<<"GEN: tlep.v4().M() = "<<tlep.v4().M()<<" thad.v4().M() = "<<thad.v4().M()<<endl;
@@ -298,7 +340,15 @@ std::pair<bool,double> TTbarSemiLepMatchableSelection::check_reco(const Reconstr
   // dR.push_back(dPhi_neutrino);
   // dR.push_back(dRblep);
 
-  double dR_sum = dR_Wd1_min; dR_sum+=dR_Wd2_min;  dR_sum+=dR_bhad_min; dR_sum+=dR_lep; dR_sum+=dPhi_neutrino; dR_sum+=dR_blep_min;
+  double dR_sum = 0.;
+  // hadronic top
+  dR_sum+=dR_hadtop;   // other jets
+  // leptonic top
+  dR_sum+=dR_lep;                // lepton
+  dR_sum+=dPhi_neutrino;         // neutrino
+  dR_sum+=dR_blep_min;           // b quark
+  dR_sum+=dR_other_toplepjets;   // other jets
+
   pair<bool,double> result;
   result.second = dR_sum;
   if(!toplep_match || !tophad_match){
@@ -349,3 +399,18 @@ bool uhh2::STCut::passes(const uhh2::Event& event){
   for(const auto & jet : *jets) st_jets += jet.pt();
   return (st_jets > min_st_) && (st_jets < max_st_);
 }
+
+
+uhh2::TopTagEventSelection::TopTagEventSelection(const TopJetId& tjetID):
+  topjetID_(tjetID) {
+
+}
+
+bool uhh2::TopTagEventSelection::passes(const uhh2::Event& event){ 
+
+  for(auto & topjet : * event.topjets){
+    if(topjetID_(topjet, event)) return true; 
+  }
+  return false;
+}
+////////////////////////////////////////////////////////

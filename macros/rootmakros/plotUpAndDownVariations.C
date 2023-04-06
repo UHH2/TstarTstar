@@ -1,0 +1,7 @@
+void plotUpAndDownVariations(){
+
+  // toFill
+
+
+
+}

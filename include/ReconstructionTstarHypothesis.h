@@ -34,6 +34,8 @@ public:
   LorentzVector gluon1_v4() const{return m_gluon1_v4;} //1st gluon from Tstar -> t + gluon
   LorentzVector gluon2_v4() const{return m_gluon2_v4;} //2nd gluon from Tstar -> t + gluon
 
+  double chi2() const{return m_chi2;} // return designated chi2 value TODO maybe replace by structure as in ReconstructionHypothesis
+
   const std::vector<Jet>& tstarlep_jets() const{return m_tstarlep_jets;}
   const std::vector<Jet>& tstarhad_jets() const{return m_tstarhad_jets;}
   const std::vector<Photon>& tstarlep_photons() const{return m_tstarlep_photons;}
@@ -75,6 +77,8 @@ public:
   void add_tstarlep_photon(const Photon& j){m_tstarlep_photons.push_back(j);}
   void add_tstarhad_photon(const Photon& j){m_tstarhad_photons.push_back(j);}
 
+  void set_chi2(double chi2){m_chi2 = chi2;}
+
   /* void set_discriminator(const std::string & label, float discr){ */
   /*     m_discriminators[label] = discr; */
   /* } */
@@ -85,9 +89,12 @@ private:
 
   LorentzVector m_tstarlep_v4;
   LorentzVector m_tstarhad_v4;
+  LorentzVector m_tstargluon_v4;
+  LorentzVector m_tstargamma_v4;
   LorentzVector m_tstar1gamma_v4, m_tstar2gamma_v4;
   LorentzVector m_tstar1gluon_v4, m_tstar2gluon_v4;
   LorentzVector m_gluon1_v4, m_gluon2_v4;
+  double m_chi2;
 
   std::vector<Jet> m_tstarlep_jets;
   std::vector<Jet> m_tstarhad_jets;

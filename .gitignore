@@ -1,0 +1,12 @@
+obj/
+macros/files/
+macros/plots/
+macros/rootmakros/plots/
+macros/rootmakros/files/
+macros/safety/
+macros/variations
+macros/ElecTriggerSFs
+config/__pycache__/
+.*
+!/.gitignore
+JobConfig.dtd

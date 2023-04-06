@@ -20,65 +20,69 @@ namespace {
 
 
 TstarTstarGenRecoMatchedHists::TstarTstarGenRecoMatchedHists(Context & ctx, const string & dirname): Hists(ctx, dirname){
+
+  h_ttbargen = ctx.get_handle<TTbarGen>("ttbargen");
+
   // book all histograms here
+  book<TH1F>("dR_ele", "dR_{e}(GEN,RECO)", 40, 0, 1.2);
+  book<TH1F>("Pt_ratio_ele", "p_{T}^{e, RECO}/p_{T}^{e, GEN}", 40, 0, 2);
+  book<TH1F>("Pt_ele", "p_{T}^{e, RECO matched}", 50, 0, 1100);
+  book<TH1F>("Eta_ele", "#eta^{e, RECO matched}", 50, -5.2, 5.2);
 
-  book<TH1F>("dR_ele", "dR_{e}(GEN,RECO)", 40, 0, 1.2);  
-  book<TH1F>("Pt_ratio_ele", "p_{T}^{e, RECO}/p_{T}^{e, GEN}", 40, 0, 2);  
-  book<TH1F>("Pt_ele", "p_{T}^{e, RECO matched}", 50, 0, 1100);  
-  book<TH1F>("Eta_ele", "#eta^{e, RECO matched}", 50, -5.2, 5.2);  
+  book<TH1F>("dR_mu", "dR_{#mu}(GEN,RECO)", 40, 0, 1.2);
+  book<TH1F>("Pt_ratio_mu", "p_{T}^{#mu, RECO}/p_{T}^{#mu, GEN}", 40, 0, 2);
+  book<TH1F>("Pt_mu", "p_{T}^{#mu, RECO matched}", 50, 0, 1100);
+  book<TH1F>("Eta_mu", "#eta^{#mu, RECO matched}", 50, -5.2, 5.2);
 
-  book<TH1F>("dR_mu", "dR_{#mu}(GEN,RECO)", 40, 0, 1.2);  
-  book<TH1F>("Pt_ratio_mu", "p_{T}^{#mu, RECO}/p_{T}^{#mu, GEN}", 40, 0, 2);  
-  book<TH1F>("Pt_mu", "p_{T}^{#mu, RECO matched}", 50, 0, 1100);  
-  book<TH1F>("Eta_mu", "#eta^{#mu, RECO matched}", 50, -5.2, 5.2);  
+  book<TH1F>("dR_photon", "dR_{#gamma}(GEN,RECO)", 40, 0, 1.2);
+  book<TH1F>("Pt_ratio_photon", "p_{T}^{#gamma, RECO}/p_{T}^{#gamma, GEN}", 40, 0, 2);
+  book<TH1F>("Pt_photon", "p_{T}^{#gamma, RECO matched}", 50, 0, 2500);
+  book<TH1F>("Eta_photon", "#eta^{#gamma, RECO matched}", 50, -5.2, 5.2);
 
-  book<TH1F>("dR_photon", "dR_{#gamma}(GEN,RECO)", 40, 0, 1.2);  
-  book<TH1F>("Pt_ratio_photon", "p_{T}^{#gamma, RECO}/p_{T}^{#gamma, GEN}", 40, 0, 2);  
-  book<TH1F>("Pt_photon", "p_{T}^{#gamma, RECO matched}", 50, 0, 2500);  
-  book<TH1F>("Eta_photon", "#eta^{#gamma, RECO matched}", 50, -5.2, 5.2);  
+  book<TH1F>("dPhi_neutrino", "d#phi_{#nu}(GEN,RECO)", 40, 0, 4.0);
+  book<TH1F>("Pt_ratio_neutrino", "p_{T}^{#nu, RECO}/p_{T}^{#nu, GEN}", 40, 0, 2);
 
-  book<TH1F>("dPhi_neutrino", "d#phi_{#nu}(GEN,RECO)", 40, 0, 4.0);  
-  book<TH1F>("Pt_ratio_neutrino", "p_{T}^{#nu, RECO}/p_{T}^{#nu, GEN}", 40, 0, 2);  
+  book<TH1F>("Pt_neutrino", "p_{T}^{#nu, RECO}", 100, 0, 2500);
 
-  book<TH1F>("Pt_neutrino", "p_{T}^{#nu, RECO}", 100, 0, 2500);  
+  book<TH1F>("AK4_dR_b", "dR_{b}(GEN,AK4 RECO)", 20, 0, 1.2);
+  book<TH1F>("AK4_Pt_ratio_b", "p_{T}^{AK4 RECO b}/p_{T}^{b, GEN}", 20, 0, 2);
+  book<TH1F>("AK4_Pt_b", "p_{T}^{AK4 RECO}_{b, RECO matched}", 100, 0, 2500);
+  book<TH1F>("AK4_Eta_b", "#eta^{AK4 RECO}_{b, RECO matched}", 50, -5.2, 5.2);
 
-  book<TH1F>("AK4_dR_b", "dR_{b}(GEN,AK4 RECO)", 20, 0, 1.2);  
-  book<TH1F>("AK4_Pt_ratio_b", "p_{T}^{AK4 RECO b}/p_{T}^{b, GEN}", 20, 0, 2);  
-  book<TH1F>("AK4_Pt_b", "p_{T}^{AK4 RECO}_{b, RECO matched}", 100, 0, 2500);  
-  book<TH1F>("AK4_Eta_b", "#eta^{AK4 RECO}_{b, RECO matched}", 50, -5.2, 5.2);  
+  book<TH1F>("AK4_dR_gluon", "dR_{gluon}(GEN,AK4 RECO)", 20, 0, 1.2);
+  book<TH1F>("AK4_id_dRmin_gluon", "ID of the close to gluon AK4 jets", 30, 0, 29);
+  book<TH1F>("AK4_Pt_ratio_gluon", "p_{T}^{AK4 RECO gluon}/p_{T}^{gluon, GEN}", 20, 0, 2);
+  book<TH1F>("AK4_Pt_gluon", "p_{T}^{AK4 gluon, RECO matched}", 100, 0, 2500);
+  book<TH1F>("AK4_Eta_gluon", "#eta^{AK4 gluon, RECO matched}", 50, -5.2, 5.2);
+  book<TH1F>("AK4_dR_top", "dR_{top}(GEN,AK4 RECO)", 20, 0, 1.2);
+  book<TH1F>("AK4_Pt_ratio_top", "p_{T}^{AK4 RECO top}/p_{T}^{top, GEN}", 20, 0, 2);
+  book<TH1F>("AK4_Pt_top", "p_{T}^{AK4 RECO}_{top, RECO matched}", 100, 0, 3300);
+  book<TH1F>("AK4_Eta_top", "#eta^{AK4 RECO}_{top, RECO matched}", 50, -5.2, 5.2);
+  book<TH1F>("N_b_AK4matched", "N_{AK4 jets} matched to GEN b quarks", 10, 0, 10);
+  book<TH1F>("N_gluon_AK4matched", "N_{AK4 jets} matched to GEN gluons", 10, 0, 10);
+  book<TH1F>("N_top_AK4matched", "N_{AK4 jets} matched to GEN tops", 10, 0, 10);
 
-  book<TH1F>("AK4_dR_gluon", "dR_{gluon}(GEN,AK4 RECO)", 20, 0, 1.2);  
-  book<TH1F>("AK4_id_dRmin_gluon", "ID of the close to gluon AK4 jets", 30, 0, 29);  
-  book<TH1F>("AK4_Pt_ratio_gluon", "p_{T}^{AK4 RECO gluon}/p_{T}^{gluon, GEN}", 20, 0, 2); 
-  book<TH1F>("AK4_Pt_gluon", "p_{T}^{AK4 gluon, RECO matched}", 100, 0, 2500);  
-  book<TH1F>("AK4_Eta_gluon", "#eta^{AK4 gluon, RECO matched}", 50, -5.2, 5.2);  
-  book<TH1F>("AK4_dR_top", "dR_{top}(GEN,AK4 RECO)", 20, 0, 1.2);  
-  book<TH1F>("AK4_Pt_ratio_top", "p_{T}^{AK4 RECO top}/p_{T}^{top, GEN}", 20, 0, 2);  
-  book<TH1F>("AK4_Pt_top", "p_{T}^{AK4 RECO}_{top, RECO matched}", 100, 0, 3300);  
-  book<TH1F>("AK4_Eta_top", "#eta^{AK4 RECO}_{top, RECO matched}", 50, -5.2, 5.2);  
-  book<TH1F>("N_b_AK4matched", "N_{AK4 jets} matched to GEN b quarks", 10, 0, 10);  
-  book<TH1F>("N_gluon_AK4matched", "N_{AK4 jets} matched to GEN gluons", 10, 0, 10);  
-  book<TH1F>("N_top_AK4matched", "N_{AK4 jets} matched to GEN tops", 10, 0, 10);  
+  book<TH1F>("AK8_dR_b", "dR_{b}(GEN,AK8 RECO)", 20, 0, 1.2);
+  book<TH1F>("AK8_Pt_ratio_b", "p_{T}^{AK8 RECO b}/p_{T}^{b, GEN}", 20, 0, 2);
+  book<TH1F>("AK8_Pt_b", "p_{T}^{AK8 RECO}_{b, RECO matched}", 100, 0, 2500);
+  book<TH1F>("AK8_Eta_b", "#eta^{AK8 RECO}_{b, RECO matched}", 50, -5.2, 5.2);
 
-  book<TH1F>("AK8_dR_b", "dR_{b}(GEN,AK8 RECO)", 20, 0, 1.2);  
-  book<TH1F>("AK8_Pt_ratio_b", "p_{T}^{AK8 RECO b}/p_{T}^{b, GEN}", 20, 0, 2);  
-  book<TH1F>("AK8_Pt_b", "p_{T}^{AK8 RECO}_{b, RECO matched}", 100, 0, 2500);  
-  book<TH1F>("AK8_Eta_b", "#eta^{AK8 RECO}_{b, RECO matched}", 50, -5.2, 5.2);  
+  book<TH1F>("AK8_dR_gluon", "dR_{gluon}(GEN,AK8 RECO)", 20, 0, 1.2);
+  book<TH1F>("AK8_id_dRmin_gluon", "ID of the close to gluon AK8 jets", 30, 0, 29);
+  book<TH1F>("AK8_Pt_ratio_gluon", "p_{T}^{AK8 RECO gluon}/p_{T}^{gluon, GEN}", 20, 0, 2);
 
-  book<TH1F>("AK8_dR_gluon", "dR_{gluon}(GEN,AK8 RECO)", 20, 0, 1.2);  
-  book<TH1F>("AK8_id_dRmin_gluon", "ID of the close to gluon AK8 jets", 30, 0, 29);  
-  book<TH1F>("AK8_Pt_ratio_gluon", "p_{T}^{AK8 RECO gluon}/p_{T}^{gluon, GEN}", 20, 0, 2);  
+  book<TH1F>("AK8_Pt_gluon", "p_{T}^{AK8 RECO}_{gluon, RECO matched}", 100, 0, 2500);
+  book<TH1F>("AK8_Eta_gluon", "#eta^{AK8 RECO}_{gluon, RECO matched}", 50, -5.2, 5.2);
+  book<TH1F>("AK8_dR_top", "dR_{top}(GEN,AK8 RECO)", 20, 0, 1.2);
+  book<TH1F>("AK8_Pt_ratio_top", "p_{T}^{AK8 RECO top}/p_{T}^{top, GEN}", 20, 0, 2);
+  book<TH1F>("AK8_Pt_top", "p_{T}^{AK8 RECO}_{top, RECO matched}", 100, 0, 3300);
+  book<TH1F>("AK8_Eta_top", "#eta^{AK8 RECO}_{top, RECO matched}", 50, -5.2, 5.2);
 
-  book<TH1F>("AK8_Pt_gluon", "p_{T}^{AK8 RECO}_{gluon, RECO matched}", 100, 0, 2500);  
-  book<TH1F>("AK8_Eta_gluon", "#eta^{AK8 RECO}_{gluon, RECO matched}", 50, -5.2, 5.2);  
-  book<TH1F>("AK8_dR_top", "dR_{top}(GEN,AK8 RECO)", 20, 0, 1.2);  
-  book<TH1F>("AK8_Pt_ratio_top", "p_{T}^{AK8 RECO top}/p_{T}^{top, GEN}", 20, 0, 2);  
-  book<TH1F>("AK8_Pt_top", "p_{T}^{AK8 RECO}_{top, RECO matched}", 100, 0, 3300);  
-  book<TH1F>("AK8_Eta_top", "#eta^{AK8 RECO}_{top, RECO matched}", 50, -5.2, 5.2);  
+  book<TH1F>("N_b_AK8matched", "N_{AK8 jets} matched to GEN b quarks", 10, 0, 10);
+  book<TH1F>("N_gluon_AK8matched", "N_{AK8 jets} matched to GEN gluons", 10, 0, 10);
+  book<TH1F>("N_top_AK8matched", "N_{AK8 jets} matched to GEN tops", 10, 0, 10);
 
-  book<TH1F>("N_b_AK8matched", "N_{AK8 jets} matched to GEN b quarks", 10, 0, 10);  
-  book<TH1F>("N_gluon_AK8matched", "N_{AK8 jets} matched to GEN gluons", 10, 0, 10);  
-  book<TH1F>("N_top_AK8matched", "N_{AK8 jets} matched to GEN tops", 10, 0, 10);  
+  book<TH1F>("topmatches", "Number of GEN quarks in leading top jet", 4, 0, 4);
 
   is_mc = ctx.get("dataset_type") == "MC";
 }
@@ -179,7 +183,7 @@ void TstarTstarGenRecoMatchedHists::fill(const Event & event){
   auto neutrino = W1d2;
   //  GenParticle lepton, neutrino;
   if(W1_islep){
-    if((abs(W1d1->pdgId()) == 11) || (abs(W1d1->pdgId()) == 13)){ 
+    if((abs(W1d1->pdgId()) == 11) || (abs(W1d1->pdgId()) == 13)){
       lepton = W1d1; neutrino = W1d2;
     }
     if((abs(W1d2->pdgId()) == 11) || (abs(W1d2->pdgId()) == 13)){
@@ -187,7 +191,7 @@ void TstarTstarGenRecoMatchedHists::fill(const Event & event){
     }
   }
   if(W2_islep){
-    if((abs(W2d1->pdgId()) == 11) || (abs(W2d1->pdgId()) == 13)){ 
+    if((abs(W2d1->pdgId()) == 11) || (abs(W2d1->pdgId()) == 13)){
       lepton = W2d1; neutrino = W2d2;
     }
     if((abs(W2d2->pdgId()) == 11) || (abs(W2d2->pdgId()) == 13)){
@@ -195,6 +199,10 @@ void TstarTstarGenRecoMatchedHists::fill(const Event & event){
     }
   }
   //  cout<<"Lepton and neutrino are assigned"<<endl;
+
+
+  // Preparation for finding best hypothesis (if already reconstructed)
+
 
   //Now let's find match from RECO objects
   // lepton
@@ -253,7 +261,7 @@ void TstarTstarGenRecoMatchedHists::fill(const Event & event){
   // Consider AK4 jets first
   double dR_max = 0.2;
   int bAK4match = 0, gluonAK4match = 0, topAK4match=0;
-int jetid = 0;
+  int jetid = 0;
   for(const auto & jet : *event.jets){
     if(deltaR(*b1,jet) <= dR_max){
       hist("AK4_dR_b")->Fill(deltaR(*b1,jet), weight);
@@ -261,13 +269,13 @@ int jetid = 0;
       hist("AK4_Pt_b")->Fill(jet.pt(), weight);
       hist("AK4_Eta_b")->Fill(jet.eta(), weight);
       bAK4match++;
-    } 
+    }
     if(deltaR(*b2,jet) <= dR_max){
       hist("AK4_dR_b")->Fill(deltaR(*b2,jet), weight);
-      hist("AK4_Pt_ratio_b")->Fill(jet.pt()/b2->pt(), weight); 
+      hist("AK4_Pt_ratio_b")->Fill(jet.pt()/b2->pt(), weight);
       hist("AK4_Pt_b")->Fill(jet.pt(), weight);
       hist("AK4_Eta_b")->Fill(jet.eta(), weight);
-      bAK4match++;     
+      bAK4match++;
     }
     if(found_gluon1 && deltaR(gluon1,jet) <= dR_max){
       hist("AK4_dR_gluon")->Fill(deltaR(gluon1,jet), weight);
@@ -291,13 +299,13 @@ int jetid = 0;
       hist("AK4_Pt_top")->Fill(jet.pt(), weight);
       hist("AK4_Eta_top")->Fill(jet.eta(), weight);
       topAK4match++;
-    } 
+    }
     if(!W2_islep && deltaR(antitop,jet) <= dR_max){//tbar->Wb,W->hadronic
       hist("AK4_dR_top")->Fill(deltaR(antitop,jet), weight);
-      hist("AK4_Pt_ratio_top")->Fill(jet.pt()/antitop.pt(), weight); 
+      hist("AK4_Pt_ratio_top")->Fill(jet.pt()/antitop.pt(), weight);
       hist("AK4_Pt_top")->Fill(jet.pt(), weight);
       hist("AK4_Eta_top")->Fill(jet.eta(), weight);
-      topAK4match++;     
+      topAK4match++;
     }
     jetid++;
   }
@@ -316,13 +324,13 @@ int jetid = 0;
       hist("AK8_Pt_b")->Fill(jet.pt(), weight);
       hist("AK8_Eta_b")->Fill(jet.eta(), weight);
       bAK8match++;
-    } 
+    }
     if(deltaR(*b2,jet) <= dR_max){
       hist("AK8_dR_b")->Fill(deltaR(*b2,jet), weight);
-      hist("AK8_Pt_ratio_b")->Fill(jet.pt()/b2->pt(), weight); 
+      hist("AK8_Pt_ratio_b")->Fill(jet.pt()/b2->pt(), weight);
       hist("AK8_Pt_b")->Fill(jet.pt(), weight);
       hist("AK8_Eta_b")->Fill(jet.eta(), weight);
-      bAK8match++;     
+      bAK8match++;
     }
     if(found_gluon1 && deltaR(gluon1,jet) <= dR_max){
       hist("AK8_dR_gluon")->Fill(deltaR(gluon1,jet), weight);
@@ -346,13 +354,13 @@ int jetid = 0;
       hist("AK8_Pt_top")->Fill(jet.pt(), weight);
       hist("AK8_Eta_top")->Fill(jet.eta(), weight);
       topAK8match++;
-    } 
+    }
     if(!W2_islep && deltaR(antitop,jet) <= dR_max){
       hist("AK8_dR_top")->Fill(deltaR(antitop,jet), weight);
-      hist("AK8_Pt_ratio_top")->Fill(jet.pt()/antitop.pt(), weight); 
+      hist("AK8_Pt_ratio_top")->Fill(jet.pt()/antitop.pt(), weight);
       hist("AK8_Pt_top")->Fill(jet.pt(), weight);
       hist("AK8_Eta_top")->Fill(jet.eta(), weight);
-      topAK8match++;     
+      topAK8match++;
     }
     topjetid++;
   }
@@ -360,11 +368,40 @@ int jetid = 0;
   hist("N_gluon_AK8matched")->Fill(gluonAK8match, weight);
   hist("N_top_AK8matched")->Fill(topAK8match, weight);
 
+  // get ttbargen
+  TTbarGen ttbargen = event.get(h_ttbargen);
+  if(!ttbargen.IsSemiLeptonicDecay()) return;
+
+  // find jet matching hadtop
+  bool topjetfound = false;
+  TopJet topjet;
+  double dR_best = 999;
+  for(const auto & jet : *event.topjets){
+    double dR_cur = deltaR(jet, ttbargen.TopHad());
+    if(dR_cur < dR_best) {
+      topjetfound = true;
+      dR_best = dR_cur;
+      topjet = jet;
+    }
+  }
+  if(topjetfound) {
+    // calculate jet radius
+    double R_topjet = (topjet.pt() > 0) ? 600/(topjet.pt()) : 1.5;
+    if(R_topjet > 1.5) R_topjet = 1.5;
+    if(R_topjet < 0.1) R_topjet = 0.1;
+    // check overlaps
+    int mergedCount = 0;
+    if(deltaR(topjet, ttbargen.BHad()) < R_topjet) mergedCount++;
+    if(deltaR(topjet, ttbargen.Q1()) < R_topjet) mergedCount++;
+    if(deltaR(topjet, ttbargen.Q2()) < R_topjet) mergedCount++;
+    hist("topmatches")->Fill(mergedCount, weight);
+  }
+  else hist("topmatches")->Fill(0., weight);
 
   //  cout<<"TstarTstarGenRecoMatchedHists: All hists are filled "<<endl;
 
- //  book<TH1F>("Lep_dR_gamma", "dR_{#gamma}(GEN,RECO)", 20, 0, 1.2);  
- //  book<TH1F>("Lep_Pt_ratio_gamma", "p_{T}^{#gamma}/p_{T}^{#gamma}", 20, 0, 2);  
+ //  book<TH1F>("Lep_dR_gamma", "dR_{#gamma}(GEN,RECO)", 20, 0, 1.2);
+ //  book<TH1F>("Lep_Pt_ratio_gamma", "p_{T}^{#gamma}/p_{T}^{#gamma}", 20, 0, 2);
 
 }
 

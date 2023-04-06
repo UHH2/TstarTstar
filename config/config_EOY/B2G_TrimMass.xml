@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE JobConfiguration PUBLIC "" "JobConfig.dtd" [
+<!ENTITY TargetLumi      "59740">
+<!ENTITY b_Cacheable     "False">
+<!ENTITY NEVT            "-1">
+
+<!ENTITY OUTPUTdir           "/nfs/dust/cms/user/flabe/B2G_Trigger_contact/data/">
+
+<!ENTITY SingleMuon2018_RunD   SYSTEM  "../../common/UHH2-datasets/RunII_102X_v1/2018/DATA_SingleMuon2018_RunD.xml">
+
+
+]>
+
+<!--
+<ConfigParse NEventsBreak="0" LastBreak="0" FileSplit="35" AutoResubmit="100"/>
+<ConfigSGE RAM="2" DISK="2" Mail="finn.labe@desy.de" Notification="as" Workdir="workdir_B2G_TrimMass"/>
+-->
+
+<!-- OutputLevel controls which messages are printed; set to VERBOSE or DEBUG for more verbosity, to WARNING or ERROR for less -->
+<JobConfiguration JobName="ExampleCycleJob" OutputLevel="INFO">
+    <Library Name="libSUHH2TstarTstar"/>
+    <Package Name="SUHH2TstarTstar.par" />
+
+   <Cycle Name="uhh2::AnalysisModuleRunner" OutputDirectory="&OUTPUTdir;/" PostFix="" TargetLumi="&TargetLumi;" >
+   <!-- <Cycle Name="uhh2::AnalysisModuleRunner"  RunMode="PROOF" ProofServer="lite://"  ProofWorkDir="/nfs/dust/cms/user/ottjoc/proof-wd/" ProofNodes="2" OutputDirectory="./" PostFix="" TargetLumi="1" >  -->
+        <!-- Verion attribute must have year in it, same as used in ntuple config, e.g. 2018, 2016v3, etc -->
+
+	      <InputData Lumi="1" NEventsMax="-1" Type="DATA" Version="SingleMuon2018_RunD_TrimMassTriggerTest_2018" Cacheable="False">
+          <!--<In FileName="/pnfs/desy.de/cms/tier2/store/user/akaravdi/RunII_102X_v1_ProductionMarch19/SingleMuon2018_ljetconsts/Run2018D/DATA_SingleMuon_Run2018D_9979_Ntuple.root" Lumi="0.0"/>-->
+          &SingleMuon2018_RunD;
+          <InputTree Name="AnalysisTree" />
+          <OutputTree Name="AnalysisTree" />
+        </InputData>
+
+
+        <UserConfig>
+            <!-- define which collections to read from the input. Only specify what you need to save I/O time -->
+	    <Item Name="PrimaryVertexCollection" Value="offlineSlimmedPrimaryVertices"/>
+	    <Item Name="ElectronCollection"      Value="slimmedElectronsUSER"/>
+	    <Item Name="PhotonCollection"        Value="slimmedPhotonsUSER"/>
+	    <Item Name="MuonCollection"          Value="slimmedMuonsUSER"/>
+	    <Item Name="JetCollection"           Value="jetsAk4Puppi"/>
+	    <Item Name="TopJetCollection"        Value="jetsAk8PuppiSubstructure_SoftDropPuppi"/>
+	    <Item Name="METName"                 Value="slimmedMETsPuppi"/>
+      <Item Name="lumi_file" Value="common/data/2018/Cert_314472-325175_13TeV_PromptReco_Collisions18_JSON.root"/>
+	    <Item Name="lumihists_lumi_per_bin" Value="500.0"/>
+
+	    <Item Name="jersmear_direction" Value="nominal"/>
+	    <Item Name="jecsmear_direction" Value="nominal"/>
+
+
+            <!-- the class name of the AnalysisModule subclasses to run: -->
+            <Item Name="AnalysisModule" Value="B2G_TrimMass_Trigger_Studies" />
+
+            <!-- tell AnalysisModuleRunner NOT to use the MC event weight from SFrame; rather let
+                 MCLumiWeight (called via CommonModules) calculate the MC event weight. The MC
+                 event weight assigned by MCLumiWeight is InputData.Lumi / Cycle.TargetLumi. -->
+            <Item Name="use_sframe_weight" Value="false" />
+
+            <!-- configuration for MCPileupReweight (run as part of CommonModules): -->
+            <Item Name="pileup_directory" Value="common/data/2018/MyMCPileupHistogram.root" />
+            <Item Name="pileup_directory_data" Value="common/data/2018/MyDataPileupHistogram2018.root" />
+
+            <!-- Some test configuration; see TstarTstarModule.cxx for how to access it: -->
+            <Item Name="TestKey" Value="TestKeyValue" />
+
+        </UserConfig>
+    </Cycle>
+</JobConfiguration>
