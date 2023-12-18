@@ -38,7 +38,7 @@ void efficiencies(TString suffix = ""){
 
   // Defining Steps
   std::vector<TString> preselSteps = {"AfterLep",  "AfterJets", "AfterST"};
-  std::vector<TString> selSteps = {"AfterMET", "AfterAK4", "AfterHOTVR", "AfterBtag", "After2D", "AfterST"};
+  std::vector<TString> selSteps = {"METcut", "AK4cut", "HOTVRcut", "btagcut", "2Dcut", "STcut"};
   std::vector<TString> recoSteps = {};
   int stepcount = preselSteps.size() + selSteps.size() + recoSteps.size();
   std::vector<TString> labels = {"Trigger and N_{lep} = 1", "jet pre-cut", "ST pre-cut", "MET cut", "AK4 cut", "HOTVR cut", "b-tag cut", "2D cut", "ST cut", "not visible"};

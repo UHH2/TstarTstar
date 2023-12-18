@@ -11,7 +11,7 @@ using namespace uhh2;
 TstarTstarDDTHists::TstarTstarDDTHists(Context & ctx, const string & dirname, const std::vector<TString> points): Hists(ctx, dirname){
 
   // ST handle
-  h_ST = ctx.get_handle<double>("ST");
+  h_ST_HOTVR = ctx.get_handle<double>("ST_HOTVR");
 
   points_ = points;
 
@@ -42,7 +42,7 @@ void TstarTstarDDTHists::fill(const Event & event, std::vector<double> taggerSco
 
   if(debug) cout << "Starting Tstar Hists." << endl;
 
-  double st = event.get(h_ST);
+  double st = event.get(h_ST_HOTVR);
   if(st > 6000) st = 5999.9; // handling overflow
 
   int i = 0;

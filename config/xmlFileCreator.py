@@ -102,8 +102,8 @@ class configContainer:
       # everything will be passed through until the end, so just put the new ones!
       self.additionalBranches = {
          'Preselection': "",
-         'Selection': "trigger_decision MC_isfake2017B MC_isfake2016B is_muevt evt_weight is_highpt weight_pu weight_pu_up weight_pu_down prefiringWeight prefiringWeightDown prefiringWeightUp",
-         'Analysis': "neutrino is_btagevent weight_sfmu_id weight_sfmu_id_down weight_sfmu_id_up weight_sfmu_iso weight_sfmu_iso_down weight_sfmu_iso_up weight_sfmu_trigger weight_sfmu_trigger_up weight_sfmu_trigger_down weight_sfelec_id weight_sfelec_id_down weight_sfelec_id_up weight_sfelec_reco weight_sfelec_reco_down weight_sfelec_reco_up weight_sfelec_trigger weight_sfelec_trigger_up weight_sfelec_trigger_down weight_btagdisc_central weight_btagdisc_lf_up weight_btagdisc_lf_down weight_btagdisc_hf_up weight_btagdisc_hf_down weight_btagdisc_hfstats1_up weight_btagdisc_hfstats1_down weight_btagdisc_hfstats2_up weight_btagdisc_hfstats2_down weight_btagdisc_lfstats1_up weight_btagdisc_lfstats1_down weight_btagdisc_lfstats2_up weight_btagdisc_lfstats2_down weight_btagdisc_cferr1_up weight_btagdisc_cferr1_down weight_btagdisc_cferr2_up weight_btagdisc_cferr2_down  ST STHOTVR weight_murmuf_upup weight_murmuf_upnone weight_murmuf_noneup weight_murmuf_nonedown weight_murmuf_downnone weight_murmuf_downdown",
+         'Selection': "trigger_decision trigger_decision_ele MC_isfake2017B MC_isfake2016B is_muevt evt_weight is_highpt weight_pu weight_pu_up weight_pu_down prefiringWeight prefiringWeightDown prefiringWeightUp",
+         'Analysis': "neutrino is_btagevent weight_sfmu_id weight_sfmu_id_down weight_sfmu_id_up weight_sfmu_iso weight_sfmu_iso_down weight_sfmu_iso_up weight_sfmu_trigger weight_sfmu_trigger_up weight_sfmu_trigger_down weight_sfelec_id weight_sfelec_id_down weight_sfelec_id_up weight_sfelec_reco weight_sfelec_reco_down weight_sfelec_reco_up weight_sfelec_trigger weight_sfelec_trigger_up weight_sfelec_trigger_down weight_btagdisc_central weight_btagdisc_lf_up weight_btagdisc_lf_down weight_btagdisc_hf_up weight_btagdisc_hf_down weight_btagdisc_hfstats1_up weight_btagdisc_hfstats1_down weight_btagdisc_hfstats2_up weight_btagdisc_hfstats2_down weight_btagdisc_lfstats1_up weight_btagdisc_lfstats1_down weight_btagdisc_lfstats2_up weight_btagdisc_lfstats2_down weight_btagdisc_cferr1_up weight_btagdisc_cferr1_down weight_btagdisc_cferr2_up weight_btagdisc_cferr2_down  ST_AK4 ST_HOTVR weight_murmuf_upup weight_murmuf_upnone weight_murmuf_noneup weight_murmuf_nonedown weight_murmuf_downnone weight_murmuf_downdown",
          'DNN': "ST_weight DNN_Inputs TstarTstar_Hyp_gHOTVR TstarTstar_Hyp_gAK4",
          'DNN_datadriven': "",
       }
@@ -113,6 +113,8 @@ class configContainer:
       self.additionalBranches["DNN"] = self.additionalBranches["DNN"]+" "+self.additionalBranches["Analysis"]
       self.additionalBranches["DNN_datadriven"] = self.additionalBranches["DNN_datadriven"]+" "+self.additionalBranches["DNN"]
       self.additionalBranches["DNN_datadriven_variation"] = self.additionalBranches["DNN_datadriven"]+" "+self.additionalBranches["DNN"]
+
+      self.additionalBranches["TriggerEff"] = self.additionalBranches["Selection"]
 
       self.systematics = list()
 
@@ -133,8 +135,10 @@ class configContainer:
                 use_me_group = False
                 if k.startswith("DATA"):
                     if (group == "DATA"): use_me_group = True
-                elif k.startswith("TstarTstar"):
+                elif k.startswith("TstarTstarToTgammaTgamma"):
                     if group == "Signal": use_me_group = True
+                elif k.startswith("TstarTstarToTgluonTgluon_Spin32"):
+                    if group == "Signal_Spin32": use_me_group = True
                 else:
                     if group == "SM": use_me_group = True
                 # end grouping block
@@ -175,7 +179,7 @@ class xmlCreator:
 
    '''Creates XML files for SFrame'''
 
-   def __init__(self, step: str, year: str, group: str, variationDirections, isTriggerEff, spinstring=""):
+   def __init__(self, step: str, year: str, group: str, variationDirections, isTriggerEff):
 
       confCon = configContainer()
       self.uhh2Dir = confCon.uhh2Dir
@@ -188,9 +192,8 @@ class xmlCreator:
       self.jersmear_direction = variationDirections["jersmear"]
       self.jecsmear_direction = variationDirections["jecsmear"]
       self.isTriggerEff = isTriggerEff
-      self.spinstring = spinstring
 
-      if step not in ['Preselection', 'Selection', 'Analysis', 'DNN', "DNN_datadriven", "DNN_datadriven_variation"]:
+      if step not in ['Preselection', 'Selection', 'Analysis', 'DNN', "DNN_datadriven", "DNN_datadriven_variation", "TriggerEff"]:
          sys.exit('Given value of argument "selection" not valid. Abort.')
       self.step = step
       if (step == "Preselection"):
@@ -205,7 +208,10 @@ class xmlCreator:
       elif (step == "DNN" or step == "DNN_datadriven" or step == "DNN_datadriven_variation"):
           self.previousFolder = "Analysis"
           self.analysisModule = "TstarTstarDNNModule"
-      if(self.isTriggerEff): self.previousFolder += "_TriggerEff"
+      elif (step == "TriggerEff"):
+          self.previousFolder = "Selection_TriggerEff"
+          self.analysisModule = "TstarTstarTriggerSFModule"
+      if(self.isTriggerEff and not step == "TriggerEff"): self.previousFolder += "_TriggerEff"
 
       if year not in ['UL16preVFP', 'UL16postVFP', 'UL17', 'UL18']:
          sys.exit('Given value of argument "year" not valid. Abort.')
@@ -223,7 +229,7 @@ class xmlCreator:
           if (not self.jersmear_direction == "nominal"): self.inputDirJERJER = "/JER_"+self.jersmear_direction+"/"
           elif (not self.jecsmear_direction == "nominal"): self.inputDirJERJER = "/JEC_"+self.jecsmear_direction+"/"
 
-      self.xmlFileName = '_'.join(['parsedConfigFile', self.step, self.year, group])+self.spinstring+'.xml'
+      self.xmlFileName = '_'.join(['parsedConfigFile', self.step, self.year, group])+'.xml'
       if(self.isTriggerEff): self.xmlFilePathBase = self.uhh2Dir+'TstarTstar/config/'+'_'.join(['config', self.step, "TriggerEff", self.year])+'/'
       else: self.xmlFilePathBase = self.uhh2Dir+'TstarTstar/config/'+'_'.join(['config', self.step, self.year])+'/'
       os.makedirs(self.xmlFilePathBase, exist_ok=True)
@@ -276,9 +282,9 @@ class xmlCreator:
          file.write('''\n''')
          for s in self.sample_list:
              if(self.step == "Preselection"):
-                 file.write('''<InputData Lumi="'''+str(s.lumi)+'''" NEventsMax="&NEVT;" Type="'''+('DATA' if s.is_data else 'MC')+'''" Version="'''+s.nickName+self.spinstring+'''&YEARsuffix;" Cacheable="&b_Cacheable;"> &'''+s.nickName+'''; <InputTree Name="AnalysisTree"/> <OutputTree Name="AnalysisTree"/> </InputData>\n''')
+                 file.write('''<InputData Lumi="'''+str(s.lumi)+'''" NEventsMax="&NEVT;" Type="'''+('DATA' if s.is_data else 'MC')+'''" Version="'''+s.nickName+'''&YEARsuffix;" Cacheable="&b_Cacheable;"> &'''+s.nickName+'''; <InputTree Name="AnalysisTree"/> <OutputTree Name="AnalysisTree"/> </InputData>\n''')
              else:
-                 file.write('''<InputData Lumi="'''+str(s.lumi)+'''" NEventsMax="&NEVT;" Type="'''+('DATA' if s.is_data else 'MC')+'''" Version="'''+s.nickName+self.spinstring+'''&YEARsuffix;" Cacheable="&b_Cacheable;"> <In FileName="&'''+s.nickName+''';" Lumi="0.0"/> <InputTree Name="AnalysisTree"/> <OutputTree Name="AnalysisTree"/> </InputData>\n''')
+                 file.write('''<InputData Lumi="'''+str(s.lumi)+'''" NEventsMax="&NEVT;" Type="'''+('DATA' if s.is_data else 'MC')+'''" Version="'''+s.nickName+'''&YEARsuffix;" Cacheable="&b_Cacheable;"> <In FileName="&'''+s.nickName+''';" Lumi="0.0"/> <InputTree Name="AnalysisTree"/> <OutputTree Name="AnalysisTree"/> </InputData>\n''')
          file.write('''\n''')
          file.write('''<UserConfig>\n''')
          file.write('''\n''')
@@ -312,21 +318,19 @@ class xmlCreator:
          file.write('''\n''')
          file.write('''<Item Name="jersmear_direction" Value="'''+ self.jersmear_direction+'''"/>\n''')
          file.write('''<Item Name="jecsmear_direction" Value="'''+ self.jecsmear_direction+'''"/>\n''')
-         if(self.step == "Selection"):
+         if (self.step == "Preselection"):
+             file.write('''<Item Name="ScaleVariationMuR" Value = "central" />''')
+             file.write('''<Item Name="ScaleVariationMuF" Value = "central" />''')
+         elif(self.step == "Selection"):
              file.write('''<!-- scale factor configuration -->\n''')
              file.write('''<Item Name="HOTVRTopTagSFs" Value="'''+self.yearVars['HOTVRSFs'][self.year]+'''"/>\n''')
              file.write('''<Item Name="SF_path" Value="/nfs/dust/cms/user/flabe/TstarTstar/CMSSW_10_2_17/src/UHH2/TstarTstar/factors/" />\n''')
              file.write('''<Item Name="NLOCorrections" Value = "/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/sfs/nnlo" />''')
-             file.write('''<Item Name="ScaleVariationMuR" Value = "central" />''')
-             file.write('''<Item Name="ScaleVariationMuF" Value = "central" />''')
-         if(self.step == "DNN_datadriven"):
+         elif(self.step == "DNN_datadriven"):
              file.write('''<Item Name="use_data_for" Value="background_extrapolation"/>\n''')
-             file.write('''<Item Name="background_estimation_purity_file" Value="'''+self.uhh2Dir+'''TstarTstar/macros/rootmakros/files/bgest_purity.root"/>\n''')
          elif(self.step == "DNN_datadriven_variation"):
              file.write('''<Item Name="use_data_for" Value="background_extrapolation_variation"/>\n''')
-             file.write('''<Item Name="background_estimation_purity_file" Value="'''+self.uhh2Dir+'''TstarTstar/macros/rootmakros/files/bgest_purity.root"/>\n''')
          if(self.isTriggerEff): file.write('''<Item Name="IsTriggerSFMeasurement" Value="True"/>\n''')
-         if not (self.spinstring == ""): file.write('''<Item Name="SignalSpinScenario" Value="'''+self.spinstring+'''"/>\n''')
          file.write('''\n''')
          file.write('''<!-- Switch for debugging of the central AnalysisModule -->\n''')
          file.write('''<Item Name="debug" Value="false"/>\n''')
@@ -369,7 +373,7 @@ class xmlCreator:
 
 if __name__=='__main__':
 
-   selections = ['Preselection', 'Selection', 'Analysis', 'DNN', 'DNN_datadriven', 'DNN_datadriven_variation']
+   selections = ['Preselection', 'Selection', 'Analysis', 'DNN', 'DNN_datadriven', 'DNN_datadriven_variation', 'TriggerEff']
    years = ['UL16preVFP','UL16postVFP','UL17', 'UL18']
    jersmear_directions = ['nominal', 'up', 'down']
    jecsmear_directions = ['nominal', 'up', 'down']
@@ -407,7 +411,7 @@ if __name__=='__main__':
    print('  Selections: '+', '.join(str(x) for x in args.selections))
    print('  Years: '+', '.join(str(x) for x in args.years))
 
-   groups = ['DATA', 'Signal', 'SM']
+   groups = ['DATA', 'Signal', 'Signal_Spin32', 'SM']
 
    configContainer.read_database_106X_v2(args.years, groups, args.triggerEff)
 
@@ -421,13 +425,6 @@ if __name__=='__main__':
          if(selection == "DNN_datadriven" or selection == "DNN_datadriven_variation"):
             x = xmlCreator(selection, year, "DATA", directions, False)
             x.write_xml()
-         elif(selection == "DNN" or selection == "DNN_datadriven_variation"):
-            for group in groups:
-               if (group == "Signal"):
-                  x = xmlCreator(selection, year, group, directions, args.triggerEff, spinstring="_32")
-                  x.write_xml()
-               x = xmlCreator(selection, year, group, directions, args.triggerEff)
-               x.write_xml()
          else:
             for group in groups:
                x = xmlCreator(selection, year, group, directions, args.triggerEff)

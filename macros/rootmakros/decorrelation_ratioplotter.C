@@ -26,17 +26,20 @@ void decorrelation_ratioplotter(){
   Double_t w = 800;
   Double_t h = 600;
 
-  TString sample = "MC.totalSM";
+  TString sample = "MC.ST";
+
+  bool drop_first_bin_for_norm = false;
+  int bin_to_drop = 6; // todo check this
 
   TString beforePath = "/nfs/dust/cms/user/flabe/TstarTstar/data/DNN/hadded/";
   TString afterPath = "/nfs/dust/cms/user/flabe/TstarTstar/data/DNN/hadded/";
   TString filename = "uhh2.AnalysisModuleRunner."+sample+".root";
-  TString beforeHistname = "pt_ST_HOTVR_rebinned";
-  TString afterHistname = "pt_ST_HOTVR_rebinned";
+  TString beforeHistname = "pt_ST_nominal";
+  TString afterHistname = "pt_ST_nominal";
   TString label = "S_{T} [GeV]";
 
-  TString beforeFolder = "newTaggerSR";
-  TString afterFolder = "newTaggerCR";
+  TString beforeFolder = "SignalRegion_total";
+  TString afterFolder = "ValidationRegion_total";
 
   TCanvas *canvas = new TCanvas("canvas", "c", w, h);
 
@@ -61,9 +64,20 @@ void decorrelation_ratioplotter(){
   if(!hist_num) std::cout << "Numerator does not exist!" << std::endl;
   if(!hist_denom) std::cout << "Denominator does not exist!" << std::endl;
 
-  hist_num->Scale(1./hist_num->Integral());
-  hist_denom->Scale(1./hist_denom->Integral());
+  double scaling_factor_num = hist_num->Integral();
+  double scaling_factor_denom = hist_denom->Integral();
 
+  if(drop_first_bin_for_norm) {
+
+    std::cout << hist_num->GetBinContent(bin_to_drop) << " " << hist_denom->GetBinContent(bin_to_drop) << std::endl;
+
+    scaling_factor_num -= hist_num->GetBinContent(bin_to_drop);
+    scaling_factor_denom -= hist_denom->GetBinContent(bin_to_drop);
+  } 
+
+  hist_num->Scale(1./scaling_factor_num);
+  hist_denom->Scale(1./scaling_factor_denom);
+  
   TH1D* hist_num_clone = (TH1D*) hist_num->Clone();
 
   hist_num->SetTitle("");
@@ -143,7 +157,7 @@ void decorrelation_ratioplotter(){
   hist_num_clone->GetYaxis()->SetTitleOffset(0.375);
   hist_num_clone->GetYaxis()->SetTitleSize(0.15);
 
-  hist_num_clone->GetYaxis()->SetRangeUser(0.5, 1.5);
+  hist_num_clone->GetYaxis()->SetRangeUser(0.5, 2);
 
   //gPad->SetLogy();
 
@@ -155,6 +169,7 @@ void decorrelation_ratioplotter(){
   hist_num_clone->Write();
   output->Close();
 
-  canvas->SaveAs("plots/decorrelationComparison_"+beforeHistname+"_"+beforeFolder+"_"+sample+".pdf");
+  if(drop_first_bin_for_norm) canvas->SaveAs("plots/decorrelationComparison_"+beforeHistname+"_"+beforeFolder+"_"+sample+"_firstDropped.pdf");
+  else canvas->SaveAs("plots/decorrelationComparison_"+beforeHistname+"_"+beforeFolder+"_"+sample+".pdf");
 
 }

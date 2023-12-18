@@ -6,16 +6,9 @@
 template<class T, size_t N>
 constexpr size_t size(T (&)[N]) { return N; }
 
-double border = 3000;
-
-TF1 *fit1, *fit2, *fit2A, *fit2B, *fitMean, *btagUp, *btagDown; // yes these need to be defined out here. Why? because root is absolutely stupid
+TF1 *fit1, *fit2, *fitMean, *btagUp, *btagDown; // yes these need to be defined out here. Why? because root is absolutely stupid
 Double_t meanFunc(Double_t *x, Double_t *par) {
   return ( fit1->EvalPar(x,par) + fit2->EvalPar(x,par) ) / 2;
-}
-
-Double_t piecewise(Double_t *x, Double_t *par) {
-  Double_t xv = x[0];
-  return (xv < border) * fit2A->EvalPar(x,par) + (xv >= border) * fit2B->EvalPar(x,par);
 }
 
 Double_t fitRatio1(Double_t *x, Double_t *par) {
@@ -34,45 +27,71 @@ Double_t btagRatioDown(Double_t *x, Double_t *par) {
   return ( btagDown->EvalPar(x,par) / fitMean->EvalPar(x,par) );
 }
 
+double GetXForHighestY(TGraphAsymmErrors graph) {
+    if (graph.GetN() == 0) {
+        // Handle invalid input or empty graph
+        return 0.0; // Or any appropriate default value
+    }
+
+    double maxY = -1e10; // Initialize to a very small value
+    double maxX = -1e10; // Initialize to a very small value
+
+    int nPoints = graph.GetN();
+    double* xValues = graph.GetX();
+    double* yValues = graph.GetY();
+
+    for (int i = 0; i < nPoints; ++i) {
+        if (yValues[i] > maxY) {
+            maxY = yValues[i];
+            maxX = xValues[i];
+        }
+    }
+
+    return maxX;
+}
+
 void backgroundEstimation(){
 
-  bool storeOutputToFile = false;
+  bool storeOutputToFile = true;
   bool plot_other_ratios = false;
+  bool plot_stat_unc = true;
 
   TString region = "VR";
+  TString year = "UL18";    // no year means full run 2
+  TString channel = "ele";  // total channel means combination of both ele and mu
+  TString JE_string = "";   // for example "_JECUp" ATTENTION MUST BE HADDED MANUALLY IN DATA FOLDER
+
+  TString systematic = ""; // for example btagging_totalUp. empty string means do not do any systematic 
 
   // definitions
   std::vector<TString> nontop_backgrounds = {"WJets", "QCD", "VV", "DYJets"};
   std::vector<TString> top_backgrounds = {"ST", "TTbar"};
 
   TString subpath_SR;
-  if (region == "VR") subpath_SR = "ValidationRegion_total";
-  else if (region == "SR") subpath_SR = "SignalRegion_total";
-  TString subpath_CR = "ControlRegion_total";
+  if (region == "VR") subpath_SR = "ValidationRegion_" + channel;
+  else if (region == "SR") subpath_SR = "SignalRegion_" + channel;
+  TString subpath_CR = "ControlRegion_" + channel;  
   TString histname = "pt_ST_nominal";
   TString path = "/nfs/dust/cms/user/flabe/TstarTstar/data/DNN/";
   TString fileprefix = "uhh2.AnalysisModuleRunner.";
 
-  TString JE_string = "";
-  path = path + "/hadded" + JE_string + "/";
+  path = path + "/" + year + "/hadded" + JE_string + "/";
 
   std::cout << "Using path: " << path << std::endl;
 
-  TH1D *histSR;
+  TH1D *histSR_nontop;
   TH1D *hist_btagCR_nontop;
   TH1D *hist_btagCR_top;
   TH1D *hist_btagCR;
-  TH1D *hist_btagCR_data;
 
-  TString systematic = ""; // empty string means do not do any systematic
   if(systematic != "") {
     histname = "pt_ST_" + systematic;
     systematic = "_" + systematic;
   }
 
   // this is only used if we plot the baseline!
-  TString other_ratios_base_path = "/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/";
-  std::vector<TString> other_ratios = {"btagging_total", "JEC", "JER"};
+  TString other_ratios_base_path = "/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/bgest/";
+  std::vector<TString> other_ratios = {"btagging_total"};
 
   // open full set of non-top backgrounds in signal region
   bool first = true;
@@ -83,9 +102,9 @@ void backgroundEstimation(){
     if(!hist) cout << "Empty hist" << endl;
     if (first) {
       first = false;
-      histSR = hist;
+      histSR_nontop = hist;
     } else {
-      histSR->Add(hist);
+      histSR_nontop->Add(hist);
     }
   }
 
@@ -136,7 +155,7 @@ void backgroundEstimation(){
   purity.Divide(hist_btagCR_nontop, hist_btagCR, "cl=0.68 b(1,1) mode");
 
   if(storeOutputToFile) {
-    TString filename = "files/bgest_purity_HOTVR_"+region+".root";
+    TString filename = "files/bgest/purity_HOTVR_" + year + "_" + channel + systematic + JE_string + ".root";
     TFile *file = new TFile(filename, "RECREATE");
     purity.SetName("purity");
     purity.Write();
@@ -146,31 +165,25 @@ void backgroundEstimation(){
   
   // calculate ratio histogram
   TGraphAsymmErrors ratio = TGraphAsymmErrors();
-  ratio.Divide(histSR, hist_btagCR, "pois");
+  ratio.Divide(histSR_nontop, hist_btagCR_nontop, "pois");
 
   // fitting landau
   fit1 = new TF1("fit1", "landau", 0, 6000);
-  ratio.Fit("fit1", "N", "", 1000, 6000);
+  ratio.Fit("fit1", "N", "", 1200, 6000);
 
+  TH1D *fit1unc = new TH1D("fit1unc", "Fit 1 with conf.band", 100, 0, 10000);
+  (TVirtualFitter::GetFitter())->GetConfidenceIntervals(fit1unc, 0.68);
+
+  TH1D *fit2unc = new TH1D("fit2unc", "Fit 2 with conf.band", 100, 0, 10000);
   if(region == "VR") {
-    // fitting some piecewise thingy
-    fit2A = new TF1("fit2A", "pol1", 0, border);
-    fit2B = new TF1("fit2B", "pol2", border, 6000);
-   
-    ratio.Fit("fit2A", "N", "", 500, border);
-    ratio.Fit("fit2B", "N", "", border, 6000);
-
-    fit2 = new TF1("fit2", piecewise, 0, 6000);
+    fit2 = new TF1("fit2", "gaus", 0, 6000);
+    ratio.Fit("fit2", "N", "", 600, 6000);
+    (TVirtualFitter::GetFitter())->GetConfidenceIntervals(fit2unc, 0.68);
   } else {
-    // fitting some piecewise thingy
-    fit2A = new TF1("fit2A", "pol1", 0, border);
-    fit2B = new TF1("fit2B", "expo", border, 6000);
-   
-    ratio.Fit("fit2A", "N", "", 500, border);
-    ratio.Fit("fit2B", "N", "", border, 6000);
+    fit2 = new TF1("fit2", "pol1", 0, 6000);
+    ratio.Fit("fit2", "N", "", 600, 6000);
+    (TVirtualFitter::GetFitter())->GetConfidenceIntervals(fit2unc, 0.68);
 
-
-    fit2 = new TF1("fit2", piecewise, 0, 6000);
   }
 
   // defining average
@@ -237,14 +250,43 @@ void backgroundEstimation(){
   fitMean->SetLineColor(1);
   fitMean->Draw("same");
 
+  if (plot_stat_unc) {
+
+    fit1unc->SetFillColorAlpha(1, 0.3);
+    //fit1unc->Draw("e3 same");
+    fit2unc->SetFillColorAlpha(1, 0.3);
+    //fit2unc->Draw("e3 same");
+
+    TH1D* uncertainty_fits = (TH1D*) fit1unc->Clone(); // just to get the structure
+
+    for (Int_t bin = 1; bin <= fit1unc->GetNbinsX(); ++bin) {
+        double bin1 = fit1unc->GetBinContent(bin);
+        double bin2 = fit2unc->GetBinContent(bin);
+
+        double binError1 = fit1unc->GetBinError(bin);
+        double binError2 = fit2unc->GetBinError(bin);
+
+        double mean = (bin1 + bin2) / 2;
+        double uncertainty = TMath::Sqrt((binError1 * binError1 + binError2 * binError2) / 4);
+
+        uncertainty_fits->SetBinContent(bin, mean);
+        uncertainty_fits->SetBinError(bin, uncertainty);
+
+    }
+
+    uncertainty_fits->SetFillColorAlpha(1, 0.3);
+    uncertainty_fits->Draw("e3 same");
+
+  }
+
   if (plot_other_ratios) {
 
     int color_int = 2;
     for (auto name : other_ratios) {
-      TFile *file_up = new TFile(other_ratios_base_path + "alphaFunction_HOTVR_" + region + "_" + name + "Up.root");
+      TFile *file_up = new TFile(other_ratios_base_path + "alphaFunction_HOTVR_" + year + "_" + region + "_" + channel + "_" + name + "Up.root");
       TGraphAsymmErrors *graph_up = (TGraphAsymmErrors*) file_up->Get("alpha_ratio")->Clone();
       TF1 *func_up = (TF1*) file_up->Get("fit_mean")->Clone();
-      TFile *file_down = new TFile(other_ratios_base_path + "alphaFunction_HOTVR_" + region + "_" + name + "Down.root");
+      TFile *file_down = new TFile(other_ratios_base_path + "alphaFunction_HOTVR_" + year + "_" + region + "_" + channel + "_" + name + "Down.root");
       TGraphAsymmErrors *graph_down = (TGraphAsymmErrors*) file_down->Get("alpha_ratio")->Clone();
       TF1 *func_down = (TF1*) file_down->Get("fit_mean")->Clone();
 
@@ -274,36 +316,21 @@ void backgroundEstimation(){
 
   }
 
-  // legend
-  legend->AddEntry(&ratio,"#alpha (nominal)","elp");
-  legend->AddEntry(fit1,"Landau fit","l");
-  legend->AddEntry(fit2,"piecewise fit","l");
-  legend->AddEntry(fitMean,"mean fit","l");
-  legend->Draw();
 
   // fit results
   TString fittxt = TString::Format("#chi^{2}/ndf: %3.2f / %3.0d", fit1->GetChisquare(), fit1->GetNDF());
-  TLatex *fitltx = new TLatex(3.5, 24, fittxt);
-  fitltx->SetNDC();
-  fitltx->SetTextAlign(33);
-  fitltx->SetX(0.8);
-  fitltx->SetTextFont(42);
-  fitltx->SetY(.845);
-  fitltx->SetTextSize(0.04);
-  //fitltx->Draw();
 
   // fit results
-  /**
-  TString fit2txt = TString::Format("#chi^{2}/ndf: %3.2f / %3.0d", fit2B->GetChisquare(), fit2B->GetNDF());
-  TLatex *fit2ltx = new TLatex(3.5, 24, fit2txt);
-  fit2ltx->SetNDC();
-  fit2ltx->SetTextAlign(33);
-  fit2ltx->SetX(0.8);
-  fit2ltx->SetTextFont(42);
-  fit2ltx->SetY(.8);
-  fit2ltx->SetTextSize(0.04);
-  fit2ltx->Draw();
-  **/
+  TString fit2txt = TString::Format("#chi^{2}/ndf: %3.2f / %3.0d", fit2->GetChisquare(), fit2->GetNDF());
+
+  // legend
+  legend->AddEntry(&ratio,"#alpha (nominal)","elp");
+  legend->AddEntry(fit1,"Landau fit (" + fittxt + ")","l");
+  if(region == "SR") legend->AddEntry(fit2,"polinomial fit (" + fit2txt + ")","l");
+  else legend->AddEntry(fit2,"gauss fit (" + fit2txt + ")","l");
+  legend->AddEntry(fitMean,"mean fit","l");
+  legend->Draw();
+
 
   // draw Lumi text
   /**
@@ -358,11 +385,11 @@ void backgroundEstimation(){
   TH1F *deviation = new TH1F("deviation", "", nbins-1, bins);
 
   // the main loop
-  int bins_before_500 = 0; // need to start at 0 because of overflow bin
+  int bins_before_600 = 0; // need to start at 0 because of overflow bin
   for (int bin = 0; bin <= nbins; bin++) {
     double st = deviation->GetBinCenter(bin);
-    if( st < 500 ) {
-      bins_before_500++;
+    if( st < 600 ) {
+      bins_before_600++;
       deviation->SetBinContent(bin, 0);
     }
     else {
@@ -370,8 +397,8 @@ void backgroundEstimation(){
       double func_val_2 = fit2->Eval(st);
       double func_val_avg = fitMean->Eval(st);
 
-      double val_ratio = ratio.GetY()[bin-bins_before_500];
-      double val_error = ratio.GetErrorY(bin-bins_before_500);
+      double val_ratio = ratio.GetY()[bin-bins_before_600];
+      double val_error = ratio.GetErrorY(bin-bins_before_600);
 
       // calculating how much the ratio deviates from the central fit
       deviation->SetBinContent(bin, val_ratio / func_val_avg);
@@ -390,6 +417,7 @@ void backgroundEstimation(){
   deviation->GetYaxis()->SetRangeUser(0.6, 1.4);
   deviation->GetXaxis()->SetRangeUser(0, 6000);
   deviation->SetMarkerStyle(8);
+  deviation->SetLineColor(1);
   deviation->GetXaxis()->SetTitle("S_{T} [GeV]");
   deviation->GetYaxis()->SetTitle("deviation");
   deviation->Draw("P");
@@ -402,10 +430,10 @@ void backgroundEstimation(){
       TH1F *deviationUp = new TH1F("deviation up " + name , "", nbins-1, bins);
       TH1F *deviationDown = new TH1F("deviation down " + name, "", nbins-1, bins);
 
-      TFile *file_up = new TFile(other_ratios_base_path + "alphaFunction_HOTVR_" + region + "_" + name + "Up.root");
+      TFile *file_up = new TFile(other_ratios_base_path + "alphaFunction_HOTVR_" + year + "_" + region + "_" + channel + "_" + name + "Up.root");
       TGraphAsymmErrors *graph_up = (TGraphAsymmErrors*) file_up->Get("alpha_ratio")->Clone();
       if(name == "btagging_total") btagUp = (TF1*) file_up->Get("fit_mean")->Clone();
-      TFile *file_down = new TFile(other_ratios_base_path + "alphaFunction_HOTVR_" + region + "_" + name + "Down.root");
+      TFile *file_down = new TFile(other_ratios_base_path + "alphaFunction_HOTVR_" + year + "_" + region + "_" + channel + "_" + name + "Down.root");
       TGraphAsymmErrors *graph_down = (TGraphAsymmErrors*) file_down->Get("alpha_ratio")->Clone();
       if(name == "btagging_total") btagDown = (TF1*) file_down->Get("fit_mean")->Clone();
 
@@ -431,7 +459,7 @@ void backgroundEstimation(){
 
       for (int bin = 0; bin <= nbins; bin++) {
         double st = deviation->GetBinCenter(bin);
-        if( st < 500 ) {
+        if( st < 600 ) {
           deviationUp->SetBinContent(bin, 0);
           deviationDown->SetBinContent(bin, 0);
         }
@@ -440,11 +468,11 @@ void backgroundEstimation(){
           double func_val_2 = fit2->Eval(st);
           double func_val_avg = fitMean->Eval(st);
 
-          double val_ratio_up = graph_up->GetY()[bin-bins_before_500];
-          double val_error_up = graph_up->GetErrorY(bin-bins_before_500);
+          double val_ratio_up = graph_up->GetY()[bin-bins_before_600];
+          double val_error_up = graph_up->GetErrorY(bin-bins_before_600);
 
-          double val_ratio_down = graph_down->GetY()[bin-bins_before_500];
-          double val_error_down = graph_down->GetErrorY(bin-bins_before_500);
+          double val_ratio_down = graph_down->GetY()[bin-bins_before_600];
+          double val_error_down = graph_down->GetErrorY(bin-bins_before_600);
 
           // calculating how much the ratio deviates from the central fit
           deviationUp->SetBinContent(bin, val_ratio_up / func_val_avg);
@@ -483,7 +511,8 @@ void backgroundEstimation(){
   ratiofit2->SetLineStyle(3);
   ratiofit2->Draw("same");
 
-  c1_hist->SaveAs("plots/backgroundEstimation_HOTVR_" + region + systematic + JE_string + ".pdf");
+  if(plot_other_ratios) c1_hist->SaveAs("plots/backgroundEstimation_HOTVR_" + year + "_" + region + "_" + channel + systematic + JE_string + "_withSysts.pdf");
+  else c1_hist->SaveAs("plots/backgroundEstimation_HOTVR_" + year + "_" + region + "_" + channel + systematic + JE_string + ".pdf");
 
   c1_hist->Clear();
 
@@ -498,12 +527,12 @@ void backgroundEstimation(){
   text2->Draw();
   text3->Draw();
 
-  c1_hist->SaveAs("plots/purity_HOTVR_" + region + systematic + JE_string + ".pdf");
+  c1_hist->SaveAs("plots/purity_HOTVR_" + year + "_" + channel + systematic + JE_string + ".pdf");
 
   // saving fit function to output file
   if(storeOutputToFile) {
     TFile *output;
-    TString filename = "files/alphaFunction_HOTVR_" + region + systematic + JE_string +".root";
+    TString filename = "files/bgest/alphaFunction_HOTVR_" + year + "_" + region + "_" + channel + systematic + JE_string +".root";
     output = TFile::Open(filename, "RECREATE");
     fit2->Write();
     fit1->Write();

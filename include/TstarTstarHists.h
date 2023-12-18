@@ -24,6 +24,8 @@ public:
 
   private:
 
+    bool is_MC;
+
     TopJetId topjetID;
     uhh2::Event::Handle<FlavorParticle> h_primlep;
     uhh2::Event::Handle<double> h_ST_AK4;
@@ -31,6 +33,10 @@ public:
 
     uhh2::Event::Handle<ReconstructionTstarHypothesis> h_tstartstar_hyp_gHOTVR;
     uhh2::Event::Handle<ReconstructionTstarHypothesis> h_tstartstar_hyp_gAK4;
+
+    uhh2::Event::Handle<float> h_weight_sfelec_idNominal;
+    uhh2::Event::Handle<float> h_weight_sfelec_triggerNominal;
+    uhh2::Event::Handle<float> h_weight_sfelec_recoNominal;
 };
 
 }

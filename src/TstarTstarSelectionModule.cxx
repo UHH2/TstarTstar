@@ -76,7 +76,6 @@ private:
   // scale factors
   std::unique_ptr<AnalysisModule> ScaleFactor_btagging;
   std::unique_ptr<AnalysisModule> ScaleFactor_NNLO;
-  std::unique_ptr<AnalysisModule> MCScaleVariations;
   std::unique_ptr<AnalysisModule> TopPtReweighting;
 
   // lepton SFs
@@ -282,7 +281,9 @@ TstarTstarSelectionModule::TstarTstarSelectionModule(Context & ctx) {
     else if(ctx.get("dataset_version").find("QCD") != std::string::npos) sample_string = "QCD";
     else if(ctx.get("dataset_version").find("Diboson") != std::string::npos) sample_string = "VV";
     else if(ctx.get("dataset_version").find("DY") != std::string::npos) sample_string = "DYJets";
-    else if(ctx.get("dataset_version").find("Tstar") != std::string::npos) sample_string = "TstarTstar";
+    else if(ctx.get("dataset_version").find("TstarTstarToTgammaTgamma") != std::string::npos) sample_string = "TstarTstar";
+    else if(ctx.get("dataset_version").find("TstarTstarToTgluonTgluon_Spin32") != std::string::npos) sample_string = "TstarTstar_Spin32";
+    // TODO add new signal samples here!
     if(debug) std::cout << "Apply 2D b-taggin yield SFs for " << sample_string << std::endl;
 
     if(sample_string != "") eventYieldFactors = (TH2D*)f->Get(sample_string);
@@ -297,7 +298,6 @@ TstarTstarSelectionModule::TstarTstarSelectionModule(Context & ctx) {
   TopPtReweighting.reset( new TopPtReweight(ctx, 0.0615, -0.0005, "ttbargen", "weight_ttbar", true) );
 
   Prefiring_direction = ctx.get("Sys_prefiring", "nominal");
-  MCScaleVariations.reset(new MCScaleVariation(ctx) );
 
   // ###### 2. set up selections ######
   if(debug) cout << "Setting up Selections." << endl;
@@ -557,9 +557,7 @@ bool TstarTstarSelectionModule::process(Event & event) {
      else if (Prefiring_direction == "up") event.weight *= event.prefiringWeightUp;
      else if (Prefiring_direction == "down") event.weight *= event.prefiringWeightDown;
   }
-  // writing MC weights
-  MCScaleVariations->process(event);
-
+  
   // hists before anything happened
   if(debug) std::cout << "Fill Crosscheck hists" << endl;
   if(event.get(h_trigger_decision)) {
@@ -984,7 +982,7 @@ bool TstarTstarSelectionModule::process(Event & event) {
 
   // NNLO corrections
   ScaleFactor_NNLO->process(event);
-  TopPtReweighting->process(event); // is not applied, but calculated
+  TopPtReweighting->process(event);
 
   // hists after theory corrections
   if(debug) std::cout << "Fill theory correction hists" << endl;

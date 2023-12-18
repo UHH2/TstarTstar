@@ -51,6 +51,7 @@ private:
   std::unique_ptr<Selection> lumi_selection;
   std::unique_ptr<AndSelection> metfilters_selection;
   std::vector<std::unique_ptr<AnalysisModule>> modules;
+  std::unique_ptr<AnalysisModule> MCScaleVariations;
 
   // GEN stuff (used for top pt reweighting)
   std::unique_ptr<uhh2::AnalysisModule> ttgenprod;
@@ -100,6 +101,7 @@ private:
   uhh2::Event::Handle<bool> h_is_highpt;
   uhh2::Event::Handle<double> h_evt_weight;
   uhh2::Event::Handle<bool> h_trigger_decision;
+  uhh2::Event::Handle<bool> h_trigger_decision_ele;
   uhh2::Event::Handle<bool> h_MC_isfake2017B;
   uhh2::Event::Handle<bool> h_MC_isfake2016B;
 
@@ -243,6 +245,10 @@ TstarTstarPreselectionModule::TstarTstarPreselectionModule(Context & ctx){
     modules.emplace_back(new MCPileupReweight(ctx, "central"));
   } 
 
+  // this will set the mc scale variation weights
+  MCScaleVariations.reset(new MCScaleVariation(ctx) );
+
+
   // - Electron Cleaner
   ElectronId eleID_lowpt = ElectronTagID(Electron::mvaEleID_Fall17_iso_V2_wp90);
   ElectronId eleID_highpt = ElectronTagID(Electron::mvaEleID_Fall17_noIso_V2_wp90);
@@ -321,6 +327,7 @@ TstarTstarPreselectionModule::TstarTstarPreselectionModule(Context & ctx){
   h_MC_isfake2017B = ctx.declare_event_output<bool>("MC_isfake2017B");
   h_MC_isfake2016B = ctx.declare_event_output<bool>("MC_isfake2016B");
   h_trigger_decision = ctx.declare_event_output<bool>("trigger_decision");
+  h_trigger_decision_ele = ctx.declare_event_output<bool>("trigger_decision_ele");
 
   // ###### 4. other MISC stuff ######
   // handle trigger SF measurement, which changes some things
@@ -367,6 +374,7 @@ bool TstarTstarPreselectionModule::process(Event & event) {
   h_common->fill(event);
   h_common_gen->fill(event);
   lumihist_common->fill(event);
+  if(is_MC) MCScaleVariations->process(event); // writing MC weights
   if(is_MC) h_PDFnorm->fill(event);
   if(debug) cout<<"Filled hists after cleaning"<<endl;
 
@@ -458,12 +466,18 @@ bool TstarTstarPreselectionModule::process(Event & event) {
     else pass_trigger = pass_trigger_SingleMu_lowpt;
 
     if(debug) std::cout << "Passed muon trigger logic: " << pass_trigger << std::endl;
-  } else if ( !event.get(h_is_muevt) && (is_MC || data_isEG || data_isEle || data_isPho )){
+  }
+  
+  if (( !event.get(h_is_muevt) && (is_MC || data_isEG || data_isEle || data_isPho ) ) || isTriggerSFMeasurement ){
+
+    // making sure that this is exclusive!!!
+    if (( event.get(h_is_muevt) && (is_MC || data_isMu )) && !isTriggerSFMeasurement) throw std::runtime_error("Trigger selection not exclusive, and this is not a SF measurement!");
+
     if(debug) std::cout << "Entered electron trigger logic" << std::endl;
 
     if(year == "2016" || year == "UL16preVFP" || year == "UL16postVFP") {
 
-      if(is_MC) {
+      if(is_MC || isTriggerSFMeasurement) {
         pass_trigger_SingleEle = (trg_ele_low->passes(event) || trg_ele_high->passes(event) || trg_pho->passes(event));
       } else {
         if (data_isPho) pass_trigger_SingleEle = (!trg_ele_low->passes(event) && !trg_ele_high->passes(event) && trg_pho->passes(event));
@@ -473,8 +487,8 @@ bool TstarTstarPreselectionModule::process(Event & event) {
     }
     else if(year == "2017" || year == "UL17") {
 
-      if(is_MC) {
-        if (event.get(h_MC_isfake2017B)) pass_trigger_SingleEle = (trg_ele_low->passes(event) || trg_pho->passes(event));
+      if(is_MC || isTriggerSFMeasurement) {
+        if (event.get(h_MC_isfake2017B) || (isTriggerSFMeasurement && data_is2017B) ) pass_trigger_SingleEle = (trg_ele_low->passes(event) || trg_pho->passes(event));
         else pass_trigger_SingleEle = (trg_ele_low->passes(event) || trg_ele_high->passes(event) || trg_pho->passes(event));
       } else {
         if (data_is2017B) {
@@ -491,13 +505,14 @@ bool TstarTstarPreselectionModule::process(Event & event) {
       pass_trigger_SingleEle = (trg_ele_low->passes(event) || trg_ele_high->passes(event) || trg_pho->passes(event));
     }
 
-    pass_trigger = pass_trigger_SingleEle;
+    if (!isTriggerSFMeasurement) pass_trigger = pass_trigger_SingleEle;
 
     if(debug) std::cout << "Passed electron trigger logic: " << pass_trigger << std::endl;
   }
 
   // setting the trigger_decision
   event.set(h_trigger_decision, pass_trigger);
+  event.set(h_trigger_decision_ele, pass_trigger_SingleEle);
 
   // hists
   // these are after our "first real" selection step, the lepton selection

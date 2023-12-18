@@ -22,7 +22,9 @@
 
 using namespace std;
 
-void getScaleEnvelope(){
+void getScaleEnvelope(TString year = "UL18", TString channel = "mu", TString region = "SignalRegion"){
+
+  std::cout << "Working on " << year << " for the " << channel << " channel in the " << region << "." << std::endl;
 
   gStyle->SetOptFit(0);
   gStyle->SetOptStat(0);
@@ -41,29 +43,22 @@ void getScaleEnvelope(){
   gStyle->SetPadRightMargin(0.07);
 
   TString filename_base = "";
-  TString year = "UL18";
   filename_base += "/nfs/dust/cms/user/flabe/TstarTstar/data/DNN/"+year+"/hadded/uhh2.AnalysisModuleRunner.MC.";
-
-  TString region = "SignalRegion";
 
   vector<TString> samples = {"TTbar", "ST"};
   vector<bool> isSignal (samples.size(), false);
-  vector<TString> masspoints = {"800", "1600", "1800", "2500"};
+  vector<TString> masspoints = {"700", "800", "900", "1000", "1100", "1200", "1300", "1400", "1500", "1600", "1700", "1800", "1900", "2000", "2250", "2500", "2750"};
   for (auto mass : masspoints) {
     samples.push_back("TstarTstar_M-" + mass);
     isSignal.push_back(true);
-    samples.push_back("TstarTstar_M-" + mass + "_32");
+    samples.push_back("TstarTstar_Spin32_M-" + mass);
     isSignal.push_back(true);
   }
 
-  TString channel = "mu";
 
   for(unsigned int i=0; i<samples.size(); i++){
 
     cout << "sample " << samples.at(i) << endl;
-
-    // check if the sample is a signal or a background
-    isSignal.at(i) = (samples.at(i).Index("TstarTstar") == 0 );
 
     TString filename = filename_base + samples.at(i) + ".root";
     TFile* f_in = new TFile(filename, "READ");
@@ -71,6 +66,21 @@ void getScaleEnvelope(){
     TH1F *h_nominal = (TH1F*)f_in->Get(region + "_" + channel + "/pt_ST_nominal");
     TH1F *h_scale_up = (TH1F*)h_nominal->Clone();
     TH1F *h_scale_down = (TH1F*)h_nominal->Clone();
+
+    // get the normalizations if we are signal
+    vector<double> scale_norm (6, 1.);
+    if( isSignal.at(i) ){
+      string scale_numb[6];
+      ifstream normfile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/signalnorm/SignalNorm_mcscale_" + year + "_" + samples.at(i) + ".txt", ios::in);
+      if (normfile.is_open()){
+        for(int k = 0; k < 6; ++k){
+          normfile >> scale_numb[k] >> scale_norm[k];
+        }
+        normfile.close();
+      } else {
+        throw std::runtime_error("Signal norm file could not be opened.");
+      }
+    }
 
     std::vector<TH1F*> variations;
     std::vector<TString> variation_names = {
@@ -81,9 +91,18 @@ void getScaleEnvelope(){
       "murmuf_downnone",
       "murmuf_downdown"
     };
+    int k = 0;
     for (auto name : variation_names) {
       TString basename = region + "_" + channel + "/pt_ST_";
-      variations.push_back((TH1F*)f_in->Get(basename + name));
+      TH1F *hist = (TH1F*)f_in->Get(basename + name);
+      
+      // scaling if we are signal!!
+      if(isSignal.at(i)) {
+        hist->Scale(scale_norm[k]);
+      }
+
+      variations.push_back(hist);
+      k++;
     }
 
     // Loop over each bin of the ST histogram and take envelope
@@ -113,7 +132,7 @@ void getScaleEnvelope(){
     gStyle->SetOptFit(0);
     gStyle->SetOptStat(0);
 
-    auto line = TLine(500.1,1,6000,1);
+    auto line = TLine(600.1,1,6000,1);
 
     int j = 0;
     for (auto variation : variations){
@@ -124,8 +143,8 @@ void getScaleEnvelope(){
       variation_ratio->SetLineWidth(3);
       variation_ratio->SetLineStyle(2);
 
-      variation_ratio->GetYaxis()->SetRangeUser(0.4, 1.8);
-      variation_ratio->GetXaxis()->SetRangeUser(500, 6000);
+      variation_ratio->GetYaxis()->SetRangeUser(0.2, 2);
+      variation_ratio->GetXaxis()->SetRangeUser(600, 6000);
       variation_ratio->GetXaxis()->SetTitle( variation_ratio->GetTitle() );
       variation_ratio->GetYaxis()->SetTitle( "variation / nominal" );
       variation_ratio->SetTitle("");
@@ -142,7 +161,7 @@ void getScaleEnvelope(){
     leg->Draw();
 
     // Save the histo with the up/down variations in root file
-    TFile* f_out = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/" + region + "_scale_" + year + "_" + channel + "_" + samples.at(i) + ".root", "RECREATE");
+    TFile* f_out = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/scale/" + region + "_scale_" + year + "_" + channel + "_" + samples.at(i) + ".root", "RECREATE");
     h_scale_up->SetName(samples.at(i)+"_scale_up");
     h_scale_down->SetName(samples.at(i)+"_scale_down");
     h_scale_up->Write();

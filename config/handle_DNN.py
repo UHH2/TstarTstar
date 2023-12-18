@@ -11,5 +11,5 @@ years = ["UL16preVFP", "UL16postVFP", "UL17", "UL18"]
 for year in years:
     os.system("sframe_batch.py -" + args.option + " config_DNN_" + year + "/parsedConfigFile_DNN_" + year + "_SM.xml")
     os.system("sframe_batch.py -" + args.option + "  config_DNN_" + year + "/parsedConfigFile_DNN_" + year + "_Signal.xml")
-    os.system("sframe_batch.py -" + args.option + "  config_DNN_" + year + "/parsedConfigFile_DNN_" + year + "_Signal_32.xml")
+    os.system("sframe_batch.py -" + args.option + "  config_DNN_" + year + "/parsedConfigFile_DNN_" + year + "_Signal_Spin32.xml")
     if(args.doData): os.system("sframe_batch.py -" + args.option + "  config_DNN_" + year + "/parsedConfigFile_DNN_" + year + "_DATA.xml")

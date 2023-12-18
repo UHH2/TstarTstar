@@ -64,22 +64,23 @@ void variationPlots(){
 
   TString sample = "TTbar";
   TString year = "";
-  TString path = "/nfs/dust/cms/user/flabe/TstarTstar/data/DNN/"+year+"/hadded";
+  TString channel = "total";
+  TString path = "/nfs/dust/cms/user/flabe/TstarTstar/data/DNN/" + year + "/";
   TString macro_path = "/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/";
   TString filename = "uhh2.AnalysisModuleRunner.MC."+sample+".root";
-  TString foldername = "SignalRegion_total";
+  TString foldername = "SignalRegion_" + channel;
   TString histname = "pt_ST";
   bool doJECJER = true;
-  bool doPDFandScale = true;
+  bool doPDFandScale = false;
 
   std::vector<TString> variations_elec = {"sfelec_id", "sfelec_reco", "sfelec_trigger"};
   std::vector<TString> variations_mu = {"sfmu_id", "sfmu_iso", "sfmu_trigger"};
   std::vector<TString> variations_btagging = {"btagging_total", "btagging_hf", "btagging_hfstats1", "btagging_hfstats2", "btagging_lf", "btagging_lfstats1", "btagging_lfstats2", "btagging_cferr1", "btagging_cferr2"};
-  std::vector<TString> variations_other = {"pu", "prefiring"};
+  std::vector<TString> variations_other = {"pu", "prefiring", "decorrelation"};
   std::vector<int> colors = {1, 2,3,4,6,7,8,9, 11, 12};
 
   // open main file
-  TFile *main_file = TFile::Open(path+"/"+filename);
+  TFile *main_file = TFile::Open(path+"/hadded/"+filename);
   if(!main_file) std::cout << "Main file does not exist" << std::endl;
   TH1D *main_hist = (TH1D*)main_file->Get(foldername+"/"+histname+"_nominal");
   if(!main_hist) std::cout << "Main hist does not exist" << std::endl;
@@ -95,11 +96,11 @@ void variationPlots(){
 
   if(doJECJER) {
     // JER
-    TFile *file_JER_up = TFile::Open(path+"_JERUp/"+filename);
+    TFile *file_JER_up = TFile::Open(path+"JER_up/hadded/"+filename);
     if(!file_JER_up) std::cout << "Main file does not exist" << std::endl;
     TH1D *hist_JER_up = (TH1D*)file_JER_up->Get(foldername+"/"+histname+"_nominal");
     if(!hist_JER_up) std::cout << "Main hist does not exist" << std::endl;
-    TFile *file_JER_down = TFile::Open(path+"_JERDown/"+filename);
+    TFile *file_JER_down = TFile::Open(path+"JER_down/hadded/"+filename);
     if(!file_JER_down) std::cout << "Main file does not exist" << std::endl;
     TH1D *hist_JER_down = (TH1D*)file_JER_down->Get(foldername+"/"+histname+"_nominal");
     if(!hist_JER_down) std::cout << "Main hist does not exist" << std::endl;
@@ -127,11 +128,11 @@ void variationPlots(){
     leg->AddEntry(hist_JER_up,"JER","l");
 
     // JEC
-    TFile *file_JEC_up = TFile::Open(path+"_JECUp/"+filename);
+    TFile *file_JEC_up = TFile::Open(path+"JEC_up/hadded/"+filename);
     if(!file_JEC_up) std::cout << "Main file does not exist" << std::endl;
     TH1D *hist_JEC_up = (TH1D*)file_JEC_up->Get(foldername+"/"+histname+"_nominal");
     if(!hist_JEC_up) std::cout << "Main hist does not exist" << std::endl;
-    TFile *file_JEC_down = TFile::Open(path+"_JECDown/"+filename);
+    TFile *file_JEC_down = TFile::Open(path+"JEC_down/hadded/"+filename);
     if(!file_JEC_down) std::cout << "Main file does not exist" << std::endl;
     TH1D *hist_JEC_down = (TH1D*)file_JEC_down->Get(foldername+"/"+histname+"_nominal");
     if(!hist_JEC_down) std::cout << "Main hist does not exist" << std::endl;
@@ -156,15 +157,17 @@ void variationPlots(){
     line.Draw("same");
     leg->Draw();
 
-    can->SaveAs("plots/variations_JECJER.pdf");
+    can->SaveAs("plots/variations_" + sample + "_JECJER_" + year + "_" + channel + ".pdf");
   }
 
   if(doPDFandScale) {
 
     leg = new TLegend(0.6,0.7,0.9,0.9);
+    leg->SetTextSize(0.03);
+    leg->SetBorderSize(0);
 
     // PDF
-    TFile *file_PDF = TFile::Open(macro_path+"/SignalRegion_PDF_"+year+"_total_"+sample+".root");
+    TFile *file_PDF = TFile::Open(macro_path+"/PDF/SignalRegion_PDF_"+year+"_" + channel + "_"+sample+".root");
     if(!file_PDF) std::cout << "Main file does not exist" << std::endl;
     TH1D *hist_PDF_up = (TH1D*)file_PDF->Get(sample+"_PDF_up");
     if(!hist_PDF_up) std::cout << "PDF hist up does not exist" << std::endl;
@@ -182,7 +185,7 @@ void variationPlots(){
     hist_PDF_down->SetLineStyle(3);
 
     // styling first
-    hist_PDF_up->GetYaxis()->SetRangeUser(0.5, 2);
+    hist_PDF_up->GetYaxis()->SetRangeUser(0.5, 2.1);
     hist_PDF_up->GetXaxis()->SetRangeUser(600, 6000);
     hist_PDF_up->GetXaxis()->SetTitle( hist_PDF_up->GetTitle() );
     hist_PDF_up->GetYaxis()->SetTitle( "variation / nominal" );
@@ -191,10 +194,10 @@ void variationPlots(){
     hist_PDF_up->Draw("hist");
     hist_PDF_down->Draw("hist same");
 
-    leg->AddEntry(hist_PDF_up,"PDF","l");
+    leg->AddEntry(hist_PDF_up, "PDF", "l");
 
     // scale
-    TFile *file_scale = TFile::Open(macro_path+"/SignalRegion_scale_"+year+"_total_"+sample+".root");
+    TFile *file_scale = TFile::Open(macro_path+"/scale/SignalRegion_scale_"+year+"_" + channel + "_"+sample+".root");
     if(!file_scale) std::cout << "Main file does not exist" << std::endl;
     TH1D *hist_scale_up = (TH1D*)file_scale->Get(sample+"_scale_up");
     if(!hist_scale_up) std::cout << "scale hist up does not exist" << std::endl;
@@ -221,7 +224,8 @@ void variationPlots(){
     line.Draw("same");
     leg->Draw();
 
-    can->SaveAs("plots/variations_PDFandScale.pdf");
+    drawCMSandLumi(year);
+    can->SaveAs("plots/variations_" + sample + "_PDFandScale_" + year + "_" + channel + ".pdf");
   }
 
   std::vector<TString> variations;
@@ -263,7 +267,7 @@ void variationPlots(){
   drawCMSandLumi(year);
   line.Draw("same");
   leg->Draw();
-  can->SaveAs("plots/variations_elec.pdf");
+  can->SaveAs("plots/variations_" + sample + "_ele_" + year + "_" + channel + ".pdf");
 
   // mu
   leg = new TLegend(0.6,0.7,0.9,0.9);
@@ -298,9 +302,10 @@ void variationPlots(){
     leg->AddEntry(hist_up,variation,"l");
 
   }
+  drawCMSandLumi(year);
   line.Draw("same");
   leg->Draw();
-  can->SaveAs("plots/variations_mu.pdf");
+  can->SaveAs("plots/variations_" + sample + "_mu_" + year + "_" + channel + ".pdf");
 
   // btagging
   leg = new TLegend(0.6,0.7,0.9,0.9);
@@ -322,7 +327,7 @@ void variationPlots(){
     hist_up->SetLineStyle(2);
     hist_down->SetLineStyle(3);
 
-    hist_up->GetYaxis()->SetRangeUser(0.2, 1.8);
+    hist_up->GetYaxis()->SetRangeUser(0., 2);
     hist_up->GetXaxis()->SetRangeUser(600, 6000);
     hist_up->GetXaxis()->SetTitle( hist_up->GetTitle() );
     hist_up->GetYaxis()->SetTitle( "variation / nominal" );
@@ -335,9 +340,10 @@ void variationPlots(){
     leg->AddEntry(hist_up,variation,"l");
 
   }
+  drawCMSandLumi(year);
   line.Draw("same");
   leg->Draw();
-  can->SaveAs("plots/variations_btagging.pdf");
+  can->SaveAs("plots/variations_" + sample + "_btagging_" + year + "_" + channel + ".pdf");
 
   // other
   leg = new TLegend(0.6,0.7,0.9,0.9);
@@ -359,7 +365,7 @@ void variationPlots(){
     hist_up->SetLineStyle(2);
     hist_down->SetLineStyle(3);
 
-    hist_up->GetYaxis()->SetRangeUser(0.9, 1.1);
+    hist_up->GetYaxis()->SetRangeUser(0.6, 1.4);
     hist_up->GetXaxis()->SetRangeUser(600, 6000);
     hist_up->GetXaxis()->SetTitle( hist_up->GetTitle() );
     hist_up->GetYaxis()->SetTitle( "variation / nominal" );
@@ -372,9 +378,10 @@ void variationPlots(){
     leg->AddEntry(hist_up,variation,"l");
 
   }
+  drawCMSandLumi(year);
   line.Draw("same");
   leg->Draw();
-  can->SaveAs("plots/variations_other.pdf");
+  can->SaveAs("plots/variations_" + sample + "_other_" + year + "_" + channel + ".pdf");
 
 
 }

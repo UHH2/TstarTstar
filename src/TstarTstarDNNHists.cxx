@@ -14,16 +14,17 @@ using namespace uhh2;
 TstarTstarDNNHists::TstarTstarDNNHists(Context & ctx, const string & dirname): Hists(ctx, dirname){
 
   h_DNN_output = ctx.get_handle<double>("DNN_output");
-  h_newTagger = ctx.get_handle<double>("newTagger");
+  h_DDT_score = ctx.get_handle<double>("DDT_score");
   h_DNN_Inputs = ctx.get_handle<std::vector<double>>("DNN_Inputs");
-  h_ST = ctx.get_handle<double>("STHOTVR");
+  h_ST_HOTVR = ctx.get_handle<double>("ST_HOTVR");
 
   // book all histograms here
   book<TH1F>("DNN_output", "DNN output", 20, 0, 1);
-  book<TH1F>("newTagger", "DDT score", 20, -1, 1);
+  book<TH1F>("DDT_score", "DDT score", 20, -1, 1);
+  book<TH1F>("DDT_score_rebinned", "DDT score", 2, -2, 2);
   book<TH1F>("DNN_output_noWeights", "DNN output NO WEIGHTS", 20, 0, 1);
   DNN_2D_ST = book<TH2D>("2D_DNN_ST", "DNN output against ST", 40, 0, 4000, 50, 0, 1);
-  newTagger_2D_ST = book<TH2D>("2D_newTagger_ST", "DNN_{DDT} against ST", 40, 0, 4000, 50, -1, 1);
+  DDT_2D_ST = book<TH2D>("2D_DDT_ST", "DNN_{DDT} against ST", 40, 0, 4000, 50, -1, 1);
   book<TH1F>("DNN_output_nolowST", "DNN output nolowST", 20, 0, 1);
 
   DNN_2D_1 = book<TH2D>("2D_DNN_1", "DNN output against lepton pt", 50, -1, 1, 50, 0, 1);
@@ -77,7 +78,7 @@ void TstarTstarDNNHists::fill(const Event & event){
 
   hist("DNN_output")->Fill(DNNoutput, weight);
   hist("DNN_output_noWeights")->Fill(DNNoutput, 1);
-  double st = event.get(h_ST);
+  double st = event.get(h_ST_HOTVR);
   DNN_2D_ST->Fill(st, DNNoutput, weight);
   if(st > 500) hist("DNN_output_nolowST")->Fill(DNNoutput, weight);
 
@@ -116,9 +117,10 @@ void TstarTstarDNNHists::fill(const Event & event){
   DNN_2D_33->Fill(inputs.at(32), DNNoutput, weight);
 
   try {
-    double newTagger = event.get(h_newTagger);
-    hist("newTagger")->Fill(newTagger, weight);
-    newTagger_2D_ST->Fill(st, newTagger, weight);
+    double DDT_score = event.get(h_DDT_score);
+    hist("DDT_score")->Fill(DDT_score, weight);
+    hist("DDT_score_rebinned")->Fill(DDT_score, weight);
+    DDT_2D_ST->Fill(st, DDT_score, weight);
   } catch(...) {}
 
 }

@@ -42,14 +42,6 @@ using namespace uhh2;
 
 namespace uhh2 {
 
-// quick method to calculate inv_mass
-float inv_mass_3(const LorentzVector& p4){ return p4.isTimelike() ? p4.mass() : -sqrt(-p4.mass2()); }
-
-/** \brief Module for the T*T*->ttbar gg MC based study
- *
- * This is the central class which calls other AnalysisModules, Hists or Selection classes.
- * This AnalysisModule, in turn, is called (via AnalysisModuleRunner) by SFrame.
- */
 class TstarTstarAnalysisModule: public AnalysisModule {
 public:
 
@@ -59,12 +51,13 @@ public:
 private:
 
   // ###### Modules ######
-  unique_ptr<Selection> toptagevt_sel;
-  unique_ptr<NeuralNetworkInputWriter> DNN_InputWriter;
-
   std::unique_ptr<uhh2::AnalysisModule> ttgenprod;
   std::unique_ptr<uhh2::AnalysisModule> reco_primlep;
 
+  unique_ptr<Selection> toptagevt_sel;
+  unique_ptr<NeuralNetworkInputWriter> DNN_InputWriter;
+
+  // t*t* reconstruction
   std::unique_ptr<TstarTstar_tgtg_TopTag_Reconstruction> Tstarreco_gHOTVR;
   std::unique_ptr<TstarTstar_tgtg_AK4_Reconstruction> Tstarreco_gAK4;
   std::unique_ptr<TstarTstar_Discrimination> TstarDiscriminator_gHOTVR;
@@ -81,7 +74,7 @@ private:
   // ##### Histograms #####
   std::unique_ptr<Hists> h_main, h_main_ttag, h_main_nottag, h_main_mu, h_main_mu_lowpt, h_main_mu_highpt, h_main_ele, h_main_ele_lowpt, h_main_ele_highpt;
   std::unique_ptr<Hists> h_reco, h_reco_ttag, h_reco_nottag, h_reco_mu, h_reco_mu_lowpt, h_reco_mu_highpt, h_reco_ele, h_reco_ele_lowpt, h_reco_ele_highpt;
-  std::unique_ptr<Hists> h_crosscheck, h_STreweighted;
+  std::unique_ptr<Hists> h_STreweighted;
   std::unique_ptr<Hists> h_main_gen;
 
   std::unique_ptr<Hists> h_DNN_Inputs, h_DNN_Inputs_reweighted;
@@ -89,12 +82,14 @@ private:
   std::unique_ptr<Hists> h_GENTstarReco;
 
   // ###### Handles ######
+  uhh2::Event::Handle<bool> h_trigger_decision;
   uhh2::Event::Handle<double> h_evt_weight;
   uhh2::Event::Handle<FlavorParticle> h_primlep;
-  uhh2::Event::Handle<double> h_ST;
-  uhh2::Event::Handle<double> h_STHOTVR;
+  uhh2::Event::Handle<double> h_ST_AK4;
+  uhh2::Event::Handle<double> h_ST_HOTVR;
   uhh2::Event::Handle<LorentzVector> h_neutrino;
   uhh2::Event::Handle<bool> h_is_btagevent;
+  uhh2::Event::Handle<bool> h_is_highpt;
 
   // for reconstruction
   uhh2::Event::Handle<TTbarGen> h_ttbargen;
@@ -109,7 +104,6 @@ private:
   bool outputDNNvalues = true;
   bool do_masspoint = false;
 
-
   // ###### other needed definitions ######
   bool isTrigger;
   bool is_MC;
@@ -120,9 +114,6 @@ private:
 
   TString year;
 
-  TH1D* ST_ratio;
-  uhh2::Event::Handle<double> h_ST_weight;
-  uhh2::Event::Handle<float> h_eletriggerweight;
 };
 
 
@@ -131,17 +122,6 @@ TstarTstarAnalysisModule::TstarTstarAnalysisModule(Context & ctx){
   // setting debug from xml file
   if(ctx.get("debug", "<not set>") == "true") debug = true;
 
-  // debug messagt
-  if(debug) {
-    cout << "Hello World from TstarTstarAnalysisModule!" << endl;
-    // If running in SFrame, the keys "dataset_version", "dataset_type", "dataset_lumi",
-    // and "target_lumi" are set to the according values in the xml file. For CMSSW, these are
-    // not set automatically, but can be set in the python config file.
-    for(auto & kv : ctx.get_all()){
-        cout << " " << kv.first << " = " << kv.second << endl;
-    }
-  }
-
   // ###### 0. Setting Variables ######
   // MC or real data
   is_MC = ctx.get("dataset_type") == "MC";
@@ -149,24 +129,23 @@ TstarTstarAnalysisModule::TstarTstarAnalysisModule(Context & ctx){
   is_TTbar = (ctx.get("dataset_version").find("TT") != std::string::npos);
   is_Signal = (ctx.get("dataset_version").find("Tstar") != std::string::npos);
 
+  // fetch trigger decision
+  h_trigger_decision = ctx.get_handle<bool>("trigger_decision");
 
   // ###### 1. Set up modules ######
   // primary lepton
   reco_primlep.reset(new PrimaryLepton(ctx));
 
   // GEN things
-  if(is_MC){
-    ttgenprod.reset(new TTbarGenProducer(ctx, "ttbargen", false));
-  }
+  if(is_MC) ttgenprod.reset(new TTbarGenProducer(ctx, "ttbargen", false));
 
   // top tag definition
+  // will not be cut on, but can be used for control region definition
   TopJetId topjetID = AndId<TopJet>(HOTVRTopTag(), Tau32Groomed(0.56));
   toptagevt_sel.reset(new TopTagEventSelection(topjetID));;
 
-
   // ###### 3. Set up histograms ######
   // before Reconstruction
-  h_crosscheck.reset(new TstarTstarHists(ctx, "crosscheck"));
   h_main.reset(new TstarTstarHists(ctx, "main"));
   h_main_ttag.reset(new TstarTstarHists(ctx, "main_ttag"));
   h_main_nottag.reset(new TstarTstarHists(ctx, "main_nottag"));
@@ -189,8 +168,6 @@ TstarTstarAnalysisModule::TstarTstarAnalysisModule(Context & ctx){
   h_reco_ele_lowpt.reset(new TstarTstarHists(ctx, "reco_ele_lowpt"));
   h_reco_ele_highpt.reset(new TstarTstarHists(ctx, "reco_ele_highpt"));
 
-  h_STreweighted.reset(new TstarTstarHists(ctx, "STreweighted"));
-
   // GEN reco
   h_GENTstarReco.reset(new TstarTstarGENTstarRecoHists(ctx, "GENTstarReco"));
 
@@ -205,21 +182,18 @@ TstarTstarAnalysisModule::TstarTstarAnalysisModule(Context & ctx){
   h_flag_toptagevent = ctx.declare_event_output<int>("flag_toptagevent");
   h_neutrino = ctx.get_handle<LorentzVector>("neutrino");
   h_is_btagevent = ctx.get_handle<bool>("is_btagevent");
+  h_is_highpt = ctx.get_handle<bool>("is_highpt");
 
   if(is_MC) h_ttbargen = ctx.get_handle<TTbarGen>("ttbargen");
-  h_ST = ctx.get_handle<double>("ST");
-  h_STHOTVR = ctx.get_handle<double>("STHOTVR");
+  h_ST_AK4 = ctx.get_handle<double>("ST_AK4");
+  h_ST_HOTVR = ctx.get_handle<double>("ST_HOTVR");
 
   // DNN output
   if(outputDNNvalues){
     DNN_InputWriter.reset(new NeuralNetworkInputWriter(ctx));
     h_do_masspoint = ctx.get_handle<bool>("do_masspoint");
-    h_ST_weight = ctx.declare_event_output<double>("ST_weight");
   }
-
-  TFile *f = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/ST_weights.root");
-  ST_ratio = (TH1D*)f->Get("ST_ratio");
-
+  
   // TstarTstar reconstruction
   Tstarreco_gHOTVR.reset(new TstarTstar_tgtg_TopTag_Reconstruction(ctx, NeutrinoReconstruction, topjetID));
   Tstarreco_gAK4.reset(new TstarTstar_tgtg_AK4_Reconstruction(ctx, NeutrinoReconstruction, topjetID));
@@ -247,7 +221,6 @@ TstarTstarAnalysisModule::TstarTstarAnalysisModule(Context & ctx){
     else throw "No year found in dataset name!";
   }
   if(debug) cout << "Year is " << year << "." << endl;
-  if(year == "UL18") h_eletriggerweight = ctx.get_handle<float>("weight_sfelec_trigger");
 
 }
 
@@ -265,8 +238,6 @@ bool TstarTstarAnalysisModule::process(Event & event) {
   const bool muon_evt = (event.muons->size() == 1);
   event.set(h_flag_muonevent, int(muon_evt));
 
-  h_crosscheck->fill(event);
-
   // set primlep
   reco_primlep->process(event);
 
@@ -279,22 +250,23 @@ bool TstarTstarAnalysisModule::process(Event & event) {
 
   if(debug) std::cout << "Hists before everything" << std::endl;
   // fill hists before things have happened
-  if(event.get(h_is_btagevent)) {
+  if(event.get(h_is_btagevent) && event.get(h_trigger_decision)) {
     h_main->fill(event);
     h_main_gen->fill(event);
     if(pass_ttag) h_main_ttag->fill(event);
     else h_main_nottag->fill(event);
     if(event.get(h_flag_muonevent)){
       h_main_mu->fill(event);
-      if(event.get(h_primlep).pt()<60) h_main_mu_lowpt->fill(event);
-      else h_main_mu_highpt->fill(event);
+      if(event.get(h_is_highpt)) h_main_mu_highpt->fill(event);
+      else h_main_mu_lowpt->fill(event);
     }
     else {
       h_main_ele->fill(event);
-      if(event.get(h_primlep).pt()<120) h_main_ele_lowpt->fill(event);
-      else h_main_ele_highpt->fill(event);
+      if(event.get(h_is_highpt)) h_main_ele_highpt->fill(event);
+      else h_main_ele_lowpt->fill(event);
     }
   }
+
 
   // ########################################
   // ########### DNN Preparation ############
@@ -305,23 +277,14 @@ bool TstarTstarAnalysisModule::process(Event & event) {
   // Filling output for DNN
   if(outputDNNvalues){
     event.set(h_do_masspoint, do_masspoint);
+
+    // output the valuea
     if(debug) cout << "Write inputs" << endl;
     DNN_InputWriter->process(event);
     if(debug) cout << "plot inputs" << endl;
-    if(event.get(h_is_btagevent)) h_DNN_Inputs->fill(event);
-    double st = event.get(h_ST);
-    double ST_weight = 1;
-    if(is_TTbar){
-      if(st > 4000) st = 3999;
-      double value = ST_ratio->GetBinContent(ST_ratio->GetXaxis()->FindBin(st));
-      if(value > 0) ST_weight = 1/value;
-      else ST_weight = 0;
-    }
-    event.set(h_ST_weight, ST_weight);
-    event.weight = event.get(h_ST_weight) * event.get(h_evt_weight);
-    if(event.get(h_is_btagevent)) h_STreweighted->fill(event);
-    if(event.get(h_is_btagevent)) h_DNN_Inputs_reweighted->fill(event);
-    event.weight = event.get(h_evt_weight);
+
+    // make some control plots
+    if(event.get(h_is_btagevent) && event.get(h_trigger_decision)) h_DNN_Inputs->fill(event);
   }
 
   // ########################################
@@ -361,20 +324,20 @@ bool TstarTstarAnalysisModule::process(Event & event) {
   }
 
   // filling hists after reco
-  if(event.get(h_is_btagevent)) {
+  if(event.get(h_is_btagevent) && event.get(h_trigger_decision)) {
     h_reco->fill(event);
     h_GENTstarReco->fill(event);
     if(pass_ttag) h_reco_ttag->fill(event);
     else h_reco_nottag->fill(event);
     if(event.get(h_flag_muonevent)){
       h_reco_mu->fill(event);
-      if(event.get(h_primlep).pt()<60) h_reco_mu_lowpt->fill(event);
-      else h_reco_mu_highpt->fill(event);
+      if(event.get(h_is_highpt)) h_reco_mu_highpt->fill(event);
+      else h_reco_mu_lowpt->fill(event);
     }
     else {
       h_reco_ele->fill(event);
-      if(event.get(h_primlep).pt()<120) h_reco_ele_lowpt->fill(event);
-      else h_reco_ele_highpt->fill(event);
+      if(event.get(h_is_highpt)) h_reco_ele_highpt->fill(event);
+      else h_reco_ele_lowpt->fill(event);
     }
   }
 

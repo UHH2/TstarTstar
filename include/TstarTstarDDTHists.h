@@ -24,7 +24,7 @@ public:
   private:
 
     // ST handle
-    uhh2::Event::Handle<double> h_ST;
+    uhh2::Event::Handle<double> h_ST_HOTVR;
 
     // points to plot for
     std::vector<TString> points_;

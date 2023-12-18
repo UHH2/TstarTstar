@@ -24,11 +24,16 @@ TstarTstarJetCorrectionHists::TstarTstarJetCorrectionHists(Context & ctx, const 
     const int n_HOTVRpt_bins = 14;
     double HOTVRpt_bins[n_HOTVRpt_bins] = {0, 200, 225, 250, 275, 300, 350, 400, 500, 600, 800, 1000, 1500, 2000};
     book<TH2D>("2D_jetresponse_genjetpt_HOTVR", ";HOTVR jet response; HOTVR GEN pt", 100, 0, 2, n_HOTVRpt_bins-1, HOTVRpt_bins);
+    book<TH2D>("eta0to1p3_2D_jetresponse_genjetpt_HOTVR", ";HOTVR jet response; HOTVR GEN pt", 100, 0, 2, n_HOTVRpt_bins-1, HOTVRpt_bins);
+    book<TH2D>("eta1p3to2p5_2D_jetresponse_genjetpt_HOTVR", ";HOTVR jet response; HOTVR GEN pt", 100, 0, 2, n_HOTVRpt_bins-1, HOTVRpt_bins);
+
 
     const int n_AK4pt_bins = 14;
     double AK4pt_bins[n_AK4pt_bins] = {0, 30, 60, 90, 120, 150, 200, 250, 300, 400, 500, 750, 1000, 1500};
     book<TH2D>("2D_jetresponse_genjetpt_AK4", ";HOTVR jet response; HOTVR GEN pt", 100, 0, 2, n_AK4pt_bins-1, AK4pt_bins);
-  
+    book<TH2D>("eta0to1p3_2D_jetresponse_genjetpt_AK4", ";HOTVR jet response; HOTVR GEN pt", 100, 0, 2, n_AK4pt_bins-1, AK4pt_bins);
+    book<TH2D>("eta1p3to2p5_2D_jetresponse_genjetpt_AK4", ";HOTVR jet response; HOTVR GEN pt", 100, 0, 2, n_AK4pt_bins-1, AK4pt_bins);
+
     book<TH1D>("lowresponse_jet_pt", "p_{T} [GeV]",  100, 0, 1000);
     book<TH1D>("lowresponse_jet_mass", "mass [GeV]",  100, 0, 1000);
     book<TH1D>("lowresponse_jet_eta", "#eta^{jet}", 50, -5.2, 5.2);
@@ -77,11 +82,15 @@ void TstarTstarJetCorrectionHists::fill(const Event & event){
 
     for(const auto & AK4genjet : *event.genjets){ // loop over GENjets
 
+        if(abs(AK4genjet.eta()) > 2.5) continue;
+
         double mindR = 99999;                           // dR of the best match (starting at something huge)
         Jet matched_RECOjet;                            // the "current" best matched reco jet
         int current_matched_jet = -1;                   // index of the "currently" best matched jet
         int i = 0;                                      // loop index
         for(const auto & AK4recojet : *event.jets){
+
+            if(abs(AK4recojet.eta()) > 2.5) continue;
 
             double this_dR = deltaR(AK4recojet, AK4genjet);
 
@@ -105,7 +114,9 @@ void TstarTstarJetCorrectionHists::fill(const Event & event){
             if(AK4index == 1) hist("ptrec_o_ptgen__AK4_second")->Fill( matched_RECOjet.pt() / AK4genjet.pt(), weight);
             hist("ptrec_o_ptgen__AK4_all")->Fill( matched_RECOjet.pt() / AK4genjet.pt(), weight);
             ((TH2D*)hist("2D_jetresponse_genjetpt_AK4"))->Fill( matched_RECOjet.pt() / AK4genjet.pt(), AK4genjet.pt(), weight);
-        
+            if(abs(AK4genjet.eta()) < 1.3) ((TH2D*)hist("eta0to1p3_2D_jetresponse_genjetpt_AK4"))->Fill( matched_RECOjet.pt() / AK4genjet.pt(), AK4genjet.pt(), weight);
+            else if(abs(AK4genjet.eta()) < 2.5) ((TH2D*)hist("eta0to1p3_2D_jetresponse_genjetpt_AK4"))->Fill( matched_RECOjet.pt() / AK4genjet.pt(), AK4genjet.pt(), weight);
+
             if(matched_RECOjet.pt() / AK4genjet.pt() < 0.25) { // making some plots for low response jets
 
                 hist("lowresponse_jet_pt")->Fill(matched_RECOjet.pt(), weight);
@@ -195,6 +206,8 @@ void TstarTstarJetCorrectionHists::fill(const Event & event){
 
     for(const auto & HOTVRgenjet : *event.gentopjets){
 
+        if(abs(HOTVRgenjet.eta()) > 2.5) continue;
+
         // we have the jet, so we need to find the pt of the matching GEN jet
 
         double mindR = 99999;
@@ -203,6 +216,8 @@ void TstarTstarJetCorrectionHists::fill(const Event & event){
         int current_matched_jet = -1;
         std::vector<int> usedJets;
         for(const auto & HOTVRrecojet : *event.topjets){
+
+            if(abs(HOTVRrecojet.eta()) > 2.5) continue;
 
             double this_dR = deltaR(HOTVRrecojet, HOTVRgenjet);
             if(this_dR < mindR && (std::find(usedJets.begin(), usedJets.end(), i)==usedJets.end())) {
@@ -221,7 +236,8 @@ void TstarTstarJetCorrectionHists::fill(const Event & event){
             if(HOTVRindex == 1) hist("ptrec_o_ptgen__HOTVR_second")->Fill( matched_RECOjet.pt() / HOTVRgenjet.pt(), weight);
             hist("ptrec_o_ptgen__HOTVR_all")->Fill( matched_RECOjet.pt() / HOTVRgenjet.pt(), weight);
             ((TH2D*)hist("2D_jetresponse_genjetpt_HOTVR"))->Fill( matched_RECOjet.pt() / HOTVRgenjet.pt(), HOTVRgenjet.pt(), weight);
-
+            if(abs(HOTVRgenjet.eta()) < 1.3) ((TH2D*)hist("eta0to1p3_2D_jetresponse_genjetpt_HOTVR"))->Fill( matched_RECOjet.pt() / HOTVRgenjet.pt(), HOTVRgenjet.pt(), weight);
+            else if(abs(HOTVRgenjet.eta()) < 2.5) ((TH2D*)hist("eta0to1p3_2D_jetresponse_genjetpt_HOTVR"))->Fill( matched_RECOjet.pt() / HOTVRgenjet.pt(), HOTVRgenjet.pt(), weight);
         }
         HOTVRindex++;
     }

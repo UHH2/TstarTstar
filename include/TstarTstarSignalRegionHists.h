@@ -23,7 +23,7 @@ public:
   private:
 
     // ST handle
-    uhh2::Event::Handle<double> h_ST;
+    uhh2::Event::Handle<double> h_ST_HOTVR;
     bool is_MC;
     bool needsOtherMCweightHandling;
 
@@ -36,7 +36,11 @@ public:
     // hist names for PDF
     std::string hist_names[100];
 
+    std::vector<TString> variations;
+
     // weight handles
+    uhh2::Event::Handle<float> h_weight_ttbar;
+
     uhh2::Event::Handle<float> h_weight_puNominal;
     uhh2::Event::Handle<float> h_weight_puUp;
     uhh2::Event::Handle<float> h_weight_puDown;

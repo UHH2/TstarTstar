@@ -251,17 +251,19 @@ NeuralNetworkIncluder::NeuralNetworkIncluder(Context& ctx, bool parametrized) {
   NNModule.reset(new NeuralNetworkModule(ctx, path+"/frozen_graph.pb", path+"/frozen_graph.config.pbtxt"));
   h_masspoint = ctx.get_handle<double>("masspoint");
   h_DNN_output = ctx.declare_event_output<double>("DNN_output");
-  h_DoAddInputs = ctx.get_handle<bool>("doAddInputs");
+  //h_DoAddInputs = ctx.get_handle<bool>("doAddInputs");
 }
 
 bool NeuralNetworkIncluder::process(Event& event) {
   NNInputCreator->createInputs(event);
   std::vector<double> inputs = NNInputCreator->getInputs();
+  /**
   if(event.get(h_DoAddInputs)) {
     NNInputCreator->createAddInputs(event);
     std::vector<double> Addinputs = NNInputCreator->getAddInputs();
     inputs.insert(inputs.end(), Addinputs.begin(), Addinputs.end());
   }
+  **/
   if(is_parametrized) inputs.push_back(event.get(h_masspoint));
 
   // Normalizing

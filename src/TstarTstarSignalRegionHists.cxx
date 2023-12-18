@@ -12,19 +12,27 @@ using namespace uhh2;
 TstarTstarSignalRegionHists::TstarTstarSignalRegionHists(Context & ctx, const string & dirname): Hists(ctx, dirname){
 
   // ST handle
-  h_ST = ctx.get_handle<double>("STHOTVR");
+  h_ST_HOTVR = ctx.get_handle<double>("ST_HOTVR");
   is_MC = ctx.get("dataset_type") == "MC";
 
   if(ctx.get("debug", "<not set>") == "true") debug = true;
 
   needsOtherMCweightHandling = ctx.get("dataset_version").find("TstarTstar") != std::string::npos;
-  if(needsOtherMCweightHandling) std::cout << "We are signal so we need other idices" << std::endl;
+  if(needsOtherMCweightHandling && debug) std::cout << "We are signal so we need other idices" << std::endl;
 
   // Histogram containing decorrelation uncertainty
-  TFile *decorrelationUncertaintyFile = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/decorrelationComparison_total_smooth.root");
+  TString sample_string = "total";      // won't be used, just to have it filled for mc only results :
+  if(is_MC) { // TODO put this into a module at some point
+    if(ctx.get("dataset_version").find("TT") != std::string::npos) sample_string = "TTbar";
+    else if(ctx.get("dataset_version").find("ST") != std::string::npos) sample_string = "ST";
+  }
+  TFile *decorrelationUncertaintyFile = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/decorrelationComparison_" + sample_string + "_smooth.root");
   decorrelationUncertainty = (TH1*)decorrelationUncertaintyFile->Get("decorrelation_uncertainty");
 
   // weight handles
+
+  // top pt reweighting
+  h_weight_ttbar = ctx.get_handle<float>("weight_ttbar");
 
   // pileup reweighting
   h_weight_puNominal = ctx.get_handle<float>("weight_pu");
@@ -90,66 +98,25 @@ TstarTstarSignalRegionHists::TstarTstarSignalRegionHists(Context & ctx, const st
 
   // binning definition
   const int nbins = 34;
-  double bins[nbins] = {0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500,
-    2600, 2700, 2800, 2900, 3000, 3250, 4000, 6000};
+  double bins[nbins] = {0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900, 3000, 3250, 4000, 6000};
+  //const int nbins = 24;
+  //double bins[nbins] = {0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1750, 2000, 2250, 2500, 2750, 3000, 4000, 6000};
 
   // nominal histogram
   book<TH1F>("pt_ST_nominal", "S_{T} [GeV]", nbins-1, bins);
 
-  // variation histograms
-  book<TH1F>("pt_ST_puUp", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_puDown", "S_{T} [GeV]", nbins-1, bins);
+  // list all variations here
+  // for each of them, an up- and down variation hist is created!!!
+  variations = {
+    "pt_ST_topPt", "pt_ST_pu", "pt_ST_prefiring", "pt_ST_btagging_total", "pt_ST_btagging_hf", "pt_ST_btagging_hfstats1", "pt_ST_btagging_hfstats2", "pt_ST_btagging_lf",
+    "pt_ST_btagging_lfstats1", "pt_ST_btagging_lfstats2", "pt_ST_btagging_cferr1", "pt_ST_btagging_cferr2", "pt_ST_sfelec_id", "pt_ST_sfelec_trigger", "pt_ST_sfelec_reco",
+    "pt_ST_sfmu_id", "pt_ST_sfmu_iso", "pt_ST_sfmu_trigger", "pt_ST_decorrelation",
+  };
 
-  book<TH1F>("pt_ST_prefiringUp", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_prefiringDown", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_btagging_totalUp", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_btagging_totalDown", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_btagging_hfUp", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_btagging_hfDown", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_btagging_hfstats1Up", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_btagging_hfstats1Down", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_btagging_hfstats2Up", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_btagging_hfstats2Down", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_btagging_lfUp", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_btagging_lfDown", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_btagging_lfstats1Up", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_btagging_lfstats1Down", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_btagging_lfstats2Up", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_btagging_lfstats2Down", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_btagging_cferr1Up", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_btagging_cferr1Down", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_btagging_cferr2Up", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_btagging_cferr2Down", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_sfelec_idUp", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_sfelec_idDown", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_sfelec_triggerUp", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_sfelec_triggerDown", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_sfelec_recoUp", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_sfelec_recoDown", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_sfmu_idUp", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_sfmu_idDown", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_sfmu_isoUp", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_sfmu_isoDown", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_sfmu_triggerUp", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_sfmu_triggerDown", "S_{T} [GeV]", nbins-1, bins);
-
-  book<TH1F>("pt_ST_decorrelationUp", "S_{T} [GeV]", nbins-1, bins);
-  book<TH1F>("pt_ST_decorrelationDown", "S_{T} [GeV]", nbins-1, bins);
+  for (const auto variation : variations) {
+    book<TH1F>(variation + "Up", "S_{T} [GeV]", nbins-1, bins);
+    book<TH1F>(variation + "Down", "S_{T} [GeV]", nbins-1, bins);
+  }
 
   // 100 histograms for the PDF stuff
   for(int i=0; i<100; i++){
@@ -191,13 +158,31 @@ void TstarTstarSignalRegionHists::fill(const Event & event){
 
   if(debug) cout << "Starting Tstar Hists." << endl;
 
-  double st = event.get(h_ST);
+  double st = event.get(h_ST_HOTVR);
   if(st > 6000) st = 5999.9; // handling overflow
 
   // fill nominal
   hist("pt_ST_nominal")->Fill(st, weight);
 
-  if(!is_MC) return;
+  // all others only make sense for MC. Fill them with "nominal" data here
+  if(!is_MC) {
+
+    for (const auto variation : variations) {
+      hist(variation+"Up")->Fill(st, weight);
+      hist(variation+"Down")->Fill(st, weight);
+    }
+    return;
+
+  }
+
+  // topPt
+  hist("pt_ST_topPtDown")->Fill(st, weight);
+  try {
+    hist("pt_ST_topPtUp")->Fill(st, weight/event.get(h_weight_ttbar));
+  } catch (...) { // catching it h_weight_ttbar was not filled...
+    hist("pt_ST_topPtUp")->Fill(st, weight);
+    if(debug) std::cout << "No top PT weight found, filling with nominal." << std::endl;
+  }
 
   // pu
   hist("pt_ST_puUp")->Fill(st, event.get(h_weight_puUp)*weight/event.get(h_weight_puNominal));
@@ -258,7 +243,7 @@ void TstarTstarSignalRegionHists::fill(const Event & event){
   // now lets do the total
   double total_greater = 0;
   double total_smaller = 0;
-  for (int i = 0; i < btag_variation_values_Up.size(); i++) {
+  for (uint i = 0; i < btag_variation_values_Up.size(); i++) {
     double valueUp = btag_variation_values_Up.at(i);
     double valueDown = btag_variation_values_Down.at(i);
     if(valueUp >= valueDown) {
@@ -309,10 +294,10 @@ void TstarTstarSignalRegionHists::fill(const Event & event){
   hist("pt_ST_decorrelationUp")->Fill(st, weight + (decorr_uncertainty * weight));
   hist("pt_ST_decorrelationDown")->Fill(st, weight - (decorr_uncertainty * weight));
 
-  if(debug) cout << "Starting btagging..." << endl;
+  if(debug) cout << "Starting systweights..." << endl;
   float orig_weight = event.genInfo->originalXWGTUP();
   int MY_FIRST_INDEX = 9;
-  if(needsOtherMCweightHandling) MY_FIRST_INDEX = 41;
+  if(needsOtherMCweightHandling) MY_FIRST_INDEX = 47;
   for(int i=0; i<100; i++){
     double pdf_weight = 0;
     if(event.genInfo->systweights().size() > 0) pdf_weight =event.genInfo->systweights().at(i+MY_FIRST_INDEX);
@@ -336,7 +321,7 @@ void TstarTstarSignalRegionHists::fill(const Event & event){
     hist("pt_ST_murmuf_downdown")->Fill(st, weight * murmuf_downdown);
   } catch (...) { }
 
-
+  if(debug) cout << "Done with plotting" << endl;
 
 }
 
