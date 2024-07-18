@@ -26,6 +26,7 @@ private:
   uhh2::Event::Handle<bool> h_is_muevt;
   std::string DNN_path;
   bool is_MC;
+  uhh2::Event::Handle< std::vector<Jet> > h_CHS_matched;
   std::vector<double> DNNInputs;
   std::vector<double> AddDNNInputs;
 };

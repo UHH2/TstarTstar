@@ -26,9 +26,10 @@ public:
     uhh2::Event::Handle<double> h_ST_HOTVR;
     bool is_MC;
     bool needsOtherMCweightHandling;
+    uhh2::Event::Handle<bool> h_flag_muonevent;
 
     // histogram containing decorrelation uncertainty
-    TH1* decorrelationUncertainty;
+    TH1 *decorrelationUncertainty, *btagyield_mu, *btagyield_ele;
 
     // debug bool
     bool debug = false;

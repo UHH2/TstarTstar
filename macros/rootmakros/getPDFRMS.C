@@ -30,14 +30,14 @@ void getPDFRMS( TString year = "UL18", TString channel = "mu", TString region = 
 
   std::cout << "Working on " << year << " for the " << channel << " channel in the " << region << "." << std::endl;
 
-  vector<TString> samples = {"TTbar", "ST"};
-  vector<bool> isSignal (samples.size(), false);
-  vector<TString> masspoints = {"700", "800", "900", "1000", "1100", "1200", "1300", "1400", "1500", "1600", "1700", "1800", "1900", "2000", "2250", "2500", "2750"};
+  vector<TString> samples = {"TTbar", "ST_s-channel", "ST_others"}; // ST treatment must be split here, as things are different. Remember to hadd them afterwards!
+  vector<bool> doNorm (samples.size(), false);
+  vector<TString> masspoints = {"700", "800", "900", "1000", "1100", "1200", "1300", "1400", "1500", "1600", "1700", "1800", "1900", "2000", "2250", "2500", "2750", "3000"};
   for (auto mass : masspoints) {
     samples.push_back("TstarTstar_M-" + mass);
-    isSignal.push_back(true);
+    doNorm.push_back(true);
     samples.push_back("TstarTstar_Spin32_M-" + mass);
-    isSignal.push_back(true);
+    doNorm.push_back(false);
   }
 
 
@@ -50,11 +50,11 @@ void getPDFRMS( TString year = "UL18", TString channel = "mu", TString region = 
 
     // For each Signal sample read the normalization values - one for each of the 100 PDF replicas
     vector<double> pdf_norm (100, 1.); //For bkgs set normalization value to 1
-    if( isSignal.at(i) ){
-      string pdf_numb[100];
+    string pdf_numb[100];
+    if( doNorm.at(i) ){
       ifstream normfile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/signalnorm/SignalNorm_" + year + "_" + samples.at(i) + ".txt", ios::in);
       if (normfile.is_open()){
-        for(int j = 0; j < 100; ++j){
+        for(int j = 0; j < 100; j++){
           normfile >> pdf_numb[j] >> pdf_norm[j];
         }
         normfile.close();
@@ -63,37 +63,39 @@ void getPDFRMS( TString year = "UL18", TString channel = "mu", TString region = 
       }
     }
 
-    TH1F *h_nominal = (TH1F*)f_in->Get(region + "_" + channel + "/pt_ST_nominal");
+    TH1F *h_nominal;
+    if (samples.at(i) == "ST_s-channel" || samples.at(i) == "ST_other" ) h_nominal = (TH1F*)f_in->Get(region + "_" + channel + "/pt_ST_PDF_2");
+    else h_nominal = (TH1F*)f_in->Get(region + "_" + channel + "/pt_ST_nominal");
     TH1F *h_PDF_up = (TH1F*)h_nominal->Clone();
     TH1F *h_PDF_down = (TH1F*)h_nominal->Clone();
 
     float sum_bins = 0;
-      // Loop over each bin of the Mtt histograms
+      // Loop over each bin of the ST histograms
      for(int j=1; j < h_nominal->GetXaxis()->GetNbins()+1; j++){
 
       float nominal = h_nominal->GetBinContent(j);
       float sum_bins = 0;
 
        // Loop over each of the 100 Histogrmas reweighted with the PDF replicas
-       for(int i=0; i<100; i++){
+       int starti = 1;
+       if (samples.at(i) == "ST_s-channel") starti = 2;
+       for(int k=starti; k<101; k++){
 
-           stringstream ss_name;
-           ss_name << region + "_" + channel + "/pt_ST_PDF_" << i + 1;
-           string s_name = ss_name.str();
-           const char* char_name = s_name.c_str();
+        stringstream ss_name;
+        ss_name << region + "_" + channel + "/pt_ST_PDF_" << k;
+        string s_name = ss_name.str();
+        const char* char_name = s_name.c_str();
 
-           float bin =  ((TH1F*)(f_in->Get(char_name)))->GetBinContent(j);
-           float norm_bin = bin * pdf_norm[i];
+        TH1F* this_hist = (TH1F*)(f_in->Get(char_name));
+        
+        float bin = this_hist->GetBinContent(j);
+        float norm_bin = bin * pdf_norm[k-1];
 
-           sum_bins += pow(norm_bin - nominal, 2);
+        sum_bins += pow(norm_bin - nominal, 2);
+
       }
 
-      float rms;
-      if( isSignal.at(i) ){
-        rms = sqrt( sum_bins / 100  );
-      } else {
-        rms = sqrt( sum_bins );
-      }
+      float rms = sqrt( sum_bins / 100  );
 
       h_PDF_up->SetBinContent(j, nominal + rms);
       h_PDF_down->SetBinContent(j, nominal - rms);
@@ -134,7 +136,7 @@ void getPDFRMS( TString year = "UL18", TString channel = "mu", TString region = 
     h_PDF_up->GetXaxis()->SetTitleSize(0.055);
     h_PDF_up->GetXaxis()->SetLabelSize(0.05);
     h_PDF_up->GetYaxis()->SetTitle("Events");
-    h_PDF_up->GetYaxis()->SetRangeUser(0.5,1.5);
+    h_PDF_up->GetYaxis()->SetRangeUser(0.8,1.2);
     h_PDF_up->GetYaxis()->SetTitleSize(0.055);
     h_PDF_up->GetYaxis()->SetLabelSize(0.05);
     h_PDF_down->Draw("HIST same");

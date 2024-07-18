@@ -26,10 +26,7 @@ void decorrelation_ratioplotter(){
   Double_t w = 800;
   Double_t h = 600;
 
-  TString sample = "MC.ST";
-
-  bool drop_first_bin_for_norm = false;
-  int bin_to_drop = 6; // todo check this
+  TString sample = "MC.TTbar";
 
   TString beforePath = "/nfs/dust/cms/user/flabe/TstarTstar/data/DNN/hadded/";
   TString afterPath = "/nfs/dust/cms/user/flabe/TstarTstar/data/DNN/hadded/";
@@ -38,8 +35,10 @@ void decorrelation_ratioplotter(){
   TString afterHistname = "pt_ST_nominal";
   TString label = "S_{T} [GeV]";
 
-  TString beforeFolder = "SignalRegion_total";
-  TString afterFolder = "ValidationRegion_total";
+  TString channel = "ele"; // options are total, mu, ele
+
+  TString beforeFolder = "SignalRegion_" + channel;
+  TString afterFolder = "ValidationRegion_"+ channel;
 
   TCanvas *canvas = new TCanvas("canvas", "c", w, h);
 
@@ -66,14 +65,6 @@ void decorrelation_ratioplotter(){
 
   double scaling_factor_num = hist_num->Integral();
   double scaling_factor_denom = hist_denom->Integral();
-
-  if(drop_first_bin_for_norm) {
-
-    std::cout << hist_num->GetBinContent(bin_to_drop) << " " << hist_denom->GetBinContent(bin_to_drop) << std::endl;
-
-    scaling_factor_num -= hist_num->GetBinContent(bin_to_drop);
-    scaling_factor_denom -= hist_denom->GetBinContent(bin_to_drop);
-  } 
 
   hist_num->Scale(1./scaling_factor_num);
   hist_denom->Scale(1./scaling_factor_denom);
@@ -164,12 +155,11 @@ void decorrelation_ratioplotter(){
   hist_num_clone->Draw("");
 
   // storing this histogram to a file to use as uncertainty later
-  TFile *output = TFile::Open("files/decorrelationComparison_" + sample + ".root", "recreate");
+  TFile *output = TFile::Open("files/decorrelationComparison_" + sample + "_" + channel + ".root", "recreate");
   hist_num_clone->SetName("decorrelation_uncertainty");
   hist_num_clone->Write();
   output->Close();
 
-  if(drop_first_bin_for_norm) canvas->SaveAs("plots/decorrelationComparison_"+beforeHistname+"_"+beforeFolder+"_"+sample+"_firstDropped.pdf");
-  else canvas->SaveAs("plots/decorrelationComparison_"+beforeHistname+"_"+beforeFolder+"_"+sample+".pdf");
+  canvas->SaveAs("plots/decorrelationComparison_"+beforeHistname+"_"+beforeFolder+"_"+sample+"_"+channel+".pdf");
 
 }

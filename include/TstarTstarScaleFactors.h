@@ -1,7 +1,5 @@
 #pragma once
 
-// this is a test 2
-
 #include <UHH2/core/include/AnalysisModule.h>
 #include <UHH2/core/include/Event.h>
 

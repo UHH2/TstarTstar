@@ -302,7 +302,9 @@ TstarTstarPreselectionModule::TstarTstarPreselectionModule(Context & ctx){
   h_jetsel_mu_highpt.reset(new TstarTstarHists(ctx, "AfterJets_mu_highpt"));
   h_ST_mu_highpt.reset(new TstarTstarHists(ctx, "AfterST_mu_highpt"));
 
-    // GEN hists
+  if(debug) cout << "normal hists donr done" << endl;
+
+  // GEN hists
   h_nocuts_gen.reset(new TstarTstarGenHists(ctx, "NoCuts_gen"));
   h_common_gen.reset(new TstarTstarGenHists(ctx, "AfterCommon_gen"));
   h_lepsel_gen.reset(new TstarTstarGenHists(ctx, "AfterLep_gen"));
@@ -311,14 +313,18 @@ TstarTstarPreselectionModule::TstarTstarPreselectionModule(Context & ctx){
   h_afterSelection_gen.reset(new TstarTstarGenHists(ctx, "AfterSel_gen"));
   h_afterSelection_genmatch.reset(new TstarTstarGenRecoMatchedHists(ctx, "AfterSel_genmatch"));
 
+  if(debug) cout << "GEN hists donr done" << endl;
+
   // Lumi hists
   lumihist_common.reset(new LuminosityHists(ctx, "lumihist_AfterCommon"));
   lumihist_lepsel.reset(new LuminosityHists(ctx, "lumihist_AfterLep"));
   lumihist_jetsel.reset(new LuminosityHists(ctx, "lumihist_AfterJets"));
 
+  if(debug) cout << "lumi hists donr done" << endl;
+
   // other histograms  
   h_electronIDhists.reset(new TstarTstarElectronIDHists(ctx, "ElectronIDHists"));
-  h_PDFnorm.reset(new TstarTstarPDFNormHists(ctx, "PDFNorm"));
+  if(is_MC) h_PDFnorm.reset(new TstarTstarPDFNormHists(ctx, "PDFNorm"));
 
   // ###### 4. init handles ######
   h_is_muevt = ctx.declare_event_output<bool>("is_muevt");
@@ -374,7 +380,7 @@ bool TstarTstarPreselectionModule::process(Event & event) {
   h_common->fill(event);
   h_common_gen->fill(event);
   lumihist_common->fill(event);
-  if(is_MC) MCScaleVariations->process(event); // writing MC weights
+  MCScaleVariations->process(event); // writing MC weights
   if(is_MC) h_PDFnorm->fill(event);
   if(debug) cout<<"Filled hists after cleaning"<<endl;
 

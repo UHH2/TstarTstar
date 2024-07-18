@@ -22,6 +22,8 @@ TstarTstarHists::TstarTstarHists(Context & ctx, const string & dirname): Hists(c
 
   is_MC = ctx.get("dataset_type") == "MC";
 
+  h_CHS_matched = ctx.get_handle<vector<Jet>>("CHS_matched");
+
   h_primlep = ctx.get_handle<FlavorParticle>("PrimaryLepton");
   h_ST_AK4 = ctx.get_handle<double>("ST_AK4");
   h_ST_HOTVR = ctx.get_handle<double>("ST_HOTVR");
@@ -279,36 +281,40 @@ void TstarTstarHists::fill(const Event & event){
   hist("N_jets")->Fill(Njets, weight);
 
   // b-tag
-  BTag bJetID_loose = BTag(BTag::algo::DEEPJET, BTag::wp::WP_LOOSE);
-  BTag bJetID_medium = BTag(BTag::algo::DEEPJET, BTag::wp::WP_MEDIUM);
-  BTag bJetID_tight = BTag(BTag::algo::DEEPJET, BTag::wp::WP_TIGHT);
+  try {
+    BTag bJetID_loose = BTag(BTag::algo::DEEPJET, BTag::wp::WP_LOOSE);
+    BTag bJetID_medium = BTag(BTag::algo::DEEPJET, BTag::wp::WP_MEDIUM);
+    BTag bJetID_tight = BTag(BTag::algo::DEEPJET, BTag::wp::WP_TIGHT);
 
-  int N_jets_btag_loose = 0;
-  int N_jets_btag_medium = 0;
-  int N_jets_btag_tight = 0;
-  Jet bjet0;
-  double highest_btag = -1;
-  for(const auto & jet : *event.jets) {
-    if(bJetID_loose(jet, event)) N_jets_btag_loose++;
-    if(bJetID_medium(jet, event)) N_jets_btag_medium++;
-    if(bJetID_tight(jet, event)) N_jets_btag_tight++;
-    hist("DeepJetscore")->Fill(jet.btag_DeepJet(), weight);
-    if (jet.btag_DeepJet() > highest_btag) {
-      highest_btag = jet.btag_DeepJet();
-      bjet0 = jet; 
+    int N_jets_btag_loose = 0;
+    int N_jets_btag_medium = 0;
+    int N_jets_btag_tight = 0;
+    Jet bjet0;
+    double highest_btag = -1;
+    for(const auto & jet : event.get(h_CHS_matched)) { // using matched CHS jets here!
+      if(bJetID_loose(jet, event)) N_jets_btag_loose++;
+      if(bJetID_medium(jet, event)) N_jets_btag_medium++;
+      if(bJetID_tight(jet, event)) N_jets_btag_tight++;
+      hist("DeepJetscore")->Fill(jet.btag_DeepJet(), weight);
+      if (jet.btag_DeepJet() > highest_btag) {
+        highest_btag = jet.btag_DeepJet();
+        bjet0 = jet; 
+      }
     }
-  }
-  // fill bjet histograms
-  if(Njets>=1){
-    hist("pt_bjet0")->Fill(jets->at(0).pt(), weight);
-    hist("pt_bjet0_rebinned")->Fill(jets->at(0).pt(), weight);
+    // fill bjet histograms
+    if(event.get(h_CHS_matched).size() > 0){
+      hist("pt_bjet0")->Fill(bjet0.pt(), weight);
+      hist("pt_bjet0_rebinned")->Fill(bjet0.pt(), weight);
+    }
+    if(event.jets->size()>0) hist("DeepJetscore_firstJet")->Fill(event.get(h_CHS_matched).at(0).btag_DeepJet(), weight);
+    hist("N_jets_btag_loose")->Fill(N_jets_btag_loose, weight);
+    hist("N_jets_btag_medium")->Fill(N_jets_btag_medium, weight);
+    hist("N_jets_btag_tight")->Fill(N_jets_btag_tight, weight);
+  } catch (...) {
+    if (debug) {std::cout << "No btagging plots as CHS matching was not run yet." << std::endl;}
   }
 
-  if(event.jets->size()>0) hist("DeepJetscore_firstJet")->Fill(event.jets->at(0).btag_DeepJet(), weight);
-
-  hist("N_jets_btag_loose")->Fill(N_jets_btag_loose, weight);
-  hist("N_jets_btag_medium")->Fill(N_jets_btag_medium, weight);
-  hist("N_jets_btag_tight")->Fill(N_jets_btag_tight, weight);
+  // PU
   if(!event.isRealData)  hist("N_PU")->Fill(event.genInfo->pileup_TrueNumInteractions(), weight);
 
   if(Njets>=1){

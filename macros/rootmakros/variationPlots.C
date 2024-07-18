@@ -63,12 +63,13 @@ void variationPlots(){
   gROOT->ForceStyle();
 
   TString sample = "TTbar";
-  TString year = "";
-  TString channel = "total";
+  TString year = "UL18";
+  TString channel = "mu";
   TString path = "/nfs/dust/cms/user/flabe/TstarTstar/data/DNN/" + year + "/";
   TString macro_path = "/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/";
   TString filename = "uhh2.AnalysisModuleRunner.MC."+sample+".root";
-  TString foldername = "SignalRegion_" + channel;
+  TString region = "SignalRegion";
+  TString foldername = region + "_" + channel;
   TString histname = "pt_ST";
   bool doJECJER = true;
   bool doPDFandScale = false;
@@ -167,7 +168,7 @@ void variationPlots(){
     leg->SetBorderSize(0);
 
     // PDF
-    TFile *file_PDF = TFile::Open(macro_path+"/PDF/SignalRegion_PDF_"+year+"_" + channel + "_"+sample+".root");
+    TFile *file_PDF = TFile::Open(macro_path+"/PDF/"+region+"_PDF_"+year+"_" + channel + "_"+sample+".root");
     if(!file_PDF) std::cout << "Main file does not exist" << std::endl;
     TH1D *hist_PDF_up = (TH1D*)file_PDF->Get(sample+"_PDF_up");
     if(!hist_PDF_up) std::cout << "PDF hist up does not exist" << std::endl;
@@ -197,7 +198,7 @@ void variationPlots(){
     leg->AddEntry(hist_PDF_up, "PDF", "l");
 
     // scale
-    TFile *file_scale = TFile::Open(macro_path+"/scale/SignalRegion_scale_"+year+"_" + channel + "_"+sample+".root");
+    TFile *file_scale = TFile::Open(macro_path+"/scale/"+region+"_scale_"+year+"_" + channel + "_"+sample+".root");
     if(!file_scale) std::cout << "Main file does not exist" << std::endl;
     TH1D *hist_scale_up = (TH1D*)file_scale->Get(sample+"_scale_up");
     if(!hist_scale_up) std::cout << "scale hist up does not exist" << std::endl;

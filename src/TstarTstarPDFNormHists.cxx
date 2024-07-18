@@ -10,10 +10,13 @@ using namespace uhh2;
 
 TstarTstarPDFNormHists::TstarTstarPDFNormHists(Context & ctx, const string & dirname): Hists(ctx, dirname){
 
-  needsOtherMCweightHandling = ctx.get("dataset_version").find("TstarTstar") != std::string::npos;
-  //if(needsOtherMCweightHandling) std::cout << "We are signal so we need other idices" << std::endl;
+  std::vector<TString> samples_that_need_other_mcweight_handling = {"TstarTstar", "DYJets", "WJets", "QCD_HT"};
+  needsOtherMCweightHandling = false;
+  for (const auto sample : samples_that_need_other_mcweight_handling) {
+    if (ctx.get("dataset_version").find(sample) != std::string::npos) needsOtherMCweightHandling = true;
+  }
+  //if(needsOtherMCweightHandling && debug) std::cout << "We are signal so we need other idices" << std::endl;
   
-  // weight handles
   book<TH1F>("nominal", "nominal", 1, 0, 1);
 
   // 100 histograms for the PDF stuff

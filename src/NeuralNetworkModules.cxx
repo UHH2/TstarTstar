@@ -88,6 +88,8 @@ NeuralNetworkInputCreator::NeuralNetworkInputCreator(Context& ctx) {
   h_do_masspoint = ctx.get_handle<bool>("do_masspoint");
   h_is_muevt = ctx.get_handle<bool>("is_muevt");
 
+  h_CHS_matched = ctx.get_handle<vector<Jet>>("CHS_matched");
+
   // Check if MC or Data
   is_MC = ctx.get("dataset_type") == "MC";
   // Init random for masspoint
@@ -113,6 +115,7 @@ bool NeuralNetworkInputCreator::setAddInputs(std::vector<double> vec) {
 }
 
 bool NeuralNetworkInputCreator::createInputs(Event& event) {
+
   // push values to vector
   const FlavorParticle& lepton = event.get(h_primlep);
   std::vector<double> values;
@@ -147,15 +150,39 @@ bool NeuralNetworkInputCreator::createInputs(Event& event) {
     values.push_back(0); // subjets
   }
 
+
+  // we'll need to redo the matching here as indices have changed in the selection
+  // this should be fixed there in the next iteration
+  // but it is not fixed right now, so this fix is needed
   double maxbtag = 0.;
-  Jet btaggedjet;
-  for (const auto & jet : *event.jets) {
-      if(jet.btag_DeepJet() > maxbtag) btaggedjet = jet;
+  Jet btaggedjet_PUPPI;
+  Jet btaggedjet_CHS;
+  for (int i = 0; i < event.jets->size(); i++) { // loop over PUPPI jets (as we are using these)
+
+    // find matching CHS jet
+    Jet this_jet = event.jets->at(i);
+    Jet matched_jet;
+
+    double deltaR_min = 99;
+    for(const Jet & CHSjet : event.get(h_CHS_matched)){ // CHS jets
+      double deltaR_CHS = deltaR(this_jet, CHSjet);
+      if(deltaR_CHS < deltaR_min) {
+        deltaR_min = deltaR_CHS;
+        matched_jet = CHSjet;
+      }
+    } // end CHS loop
+
+    double this_btag = matched_jet.btag_DeepJet();
+    if(this_btag > maxbtag) {
+      btaggedjet_PUPPI = this_jet;
+      btaggedjet_CHS = matched_jet;
+    }
+    
   }
-  values.push_back(btaggedjet.pt());
-  values.push_back(btaggedjet.eta());
-  values.push_back(btaggedjet.phi());
-  values.push_back(btaggedjet.btag_DeepJet());
+  values.push_back(btaggedjet_PUPPI.pt());
+  values.push_back(btaggedjet_PUPPI.eta());
+  values.push_back(btaggedjet_PUPPI.phi());
+  values.push_back(btaggedjet_CHS.btag_DeepJet());
 
   // MET
   values.push_back(event.met->pt());
@@ -243,7 +270,8 @@ std::vector<double> NeuralNetworkInputNormalizer::normalizeInputs(uhh2::Event& e
 NeuralNetworkIncluder::NeuralNetworkIncluder(Context& ctx, bool parametrized) {
   is_parametrized = parametrized;
   //path = "/nfs/dust/cms/user/flabe/MLCorner/TstarNN/reweightingApproach/NonParametric/";
-  path = "/nfs/dust/cms/user/flabe/TstarTstar/Jupyter/TstarTstar_NN/models/chosenModel/main__layers_25_25_25_25_1__activation_tanh__loss_mean_squared_error__lr_1e-05__batchsize_4096__dropout_0__batchnorm_0/frozen/";
+  // the old one: path = "/nfs/dust/cms/user/flabe/TstarTstar/Jupyter/TstarTstar_NN/models/chosenModel/main__layers_25_25_25_25_1__activation_tanh__loss_mean_squared_error__lr_1e-05__batchsize_4096__dropout_0__batchnorm_0/frozen/";
+  path = "/nfs/dust/cms/user/flabe/TstarTstar/Jupyter/TstarTstar_NN/models_retraining_2024/UL16postVFP__layers_25_25_25_25_1__activation_tanh__loss_mean_squared_error__lr_1e-05__batchsize_4096__dropout_0__batchnorm_0/frozen/";
   NNInputCreator.reset(new NeuralNetworkInputCreator(ctx));
   //NNInputNormalizer.reset(new NeuralNetworkInputNormalizer(ctx, path+"/data/"));
   NNInputNormalizer.reset(new NeuralNetworkInputNormalizer(ctx, path));
@@ -300,6 +328,7 @@ NeuralNetworkInputWriter::NeuralNetworkInputWriter(Context& ctx) {
 }
 
 bool NeuralNetworkInputWriter::process(uhh2::Event& event) {
+
   NNInputCreator->createInputs(event);
   NNInputCreator->createAddInputs(event);
   std::vector<double> Inputs = NNInputCreator->getInputs();
@@ -312,6 +341,7 @@ bool NeuralNetworkInputWriter::process(uhh2::Event& event) {
     event.set(handle, Inputs.at(i));
     i++;
   }
+
   i = 0;
   for(auto & handle : Addhandles){
     event.set(handle, AddInputs.at(i));
@@ -327,8 +357,8 @@ bool NeuralNetworkInputWriter::process(uhh2::Event& event) {
       }
     }
   }
-  if(masspoint == -1){ // if no TstarFound (eg Data or Background) set random between 700 and 1600
-    masspoint = std::rand() % 1801 + 200; // random between 200 and 2000, inclusively!
+  if(masspoint == -1){ // if no TstarFound (eg Data or Background) set random between 200 and 2000, inclusively!
+    masspoint = std::rand() % 1801 + 200;
   }
   event.set(h_masspoint, masspoint);
 

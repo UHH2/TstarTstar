@@ -183,25 +183,36 @@ void CMSLabel(double x=0.25, double y=0.83, TString extra = ""){
 }
 
 // -------------------------------------------------------------------------------------------
-void CMSLabelOffset(double x=0.25, double y=0.83, double x1 = 0.0, double y1 = 0.0){
+void CMSLabelOffset(double x=0.25, double y=0.83, double x1 = 0.0, double y1 = 0.0, TString extra = ""){
   TString cmstext = "CMS";
   TLatex *text = new TLatex(3.5, 24, cmstext);
   text->SetNDC();
   text->SetTextAlign(13);
   text->SetX(x);
   text->SetTextFont(62);
-  text->SetTextSize(0.05);
+  text->SetTextSize(0.055);
   text->SetY(y);
   text->Draw();
 
-  TString simtext = "Work in Progress";
-  TLatex *text3 = new TLatex(3.5, 24, simtext);
+  TLatex *text3 = new TLatex(3.5, 24, extra);
   text3->SetNDC();
   text3->SetTextAlign(13);
   text3->SetX(x+x1);
   text3->SetTextFont(52);
-  text3->SetTextSize(0.035);
+  text3->SetTextSize(0.04);
   text3->SetY(y+y1);
+  text3->Draw();
+}
+
+// -------------------------------------------------------------------------------------------
+void PrivateWorkLabel(double x=0.25, double y=0.83, TString extra = ""){
+  TLatex *text3 = new TLatex(3.5, 24, extra);
+  text3->SetNDC();
+  text3->SetTextAlign(13);
+  text3->SetX(x);
+  text3->SetTextFont(52);
+  text3->SetTextSize(0.04);
+  text3->SetY(y);
   text3->Draw();
 }
 
@@ -241,7 +252,7 @@ void CMSSimLabel(bool prelim, double x=0.24, double y=0.9){
 }
 
 // -------------------------------------------------------------------------------------------
-void LumiInfo(double lumi = 35.9, bool bratio = false, double x=0.9, double y=0.945){
+void LumiInfo(double lumi = 35.9, bool bratio = false, double x=0.9, double y=0.9){
   TString infotext = TString::Format("%3.1f fb^{-1} (13 TeV)", lumi);
   TLatex *text1 = new TLatex(3.5, 24, infotext);
   text1->SetNDC();
@@ -249,6 +260,7 @@ void LumiInfo(double lumi = 35.9, bool bratio = false, double x=0.9, double y=0.
   text1->SetTextFont(42);
   text1->SetX(x);
   text1->SetY(y);
+  text1->SetTextSize(0.04);
   text1->Draw();
 }
 

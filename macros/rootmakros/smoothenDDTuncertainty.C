@@ -2,10 +2,12 @@
 
 void smoothenDDTuncertainty() {
 
+    TString sample = "TTbar";
+
     const int nbins = 34;
 
     // drawing error from decorrelation
-    TFile *decorrelationUncertaintyFile = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/decorrelationComparison_MC.ST.root");
+    TFile *decorrelationUncertaintyFile = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/decorrelationComparison_MC."+sample+".root");
     TH1* decorrelationUncertainty_ori = (TH1*)decorrelationUncertaintyFile->Get("decorrelation_uncertainty");
     TH1* decorrelationUncertainty = (TH1*)decorrelationUncertainty_ori->Clone();
     for (int bin = -1; bin <= nbins; bin++) {
@@ -28,7 +30,7 @@ void smoothenDDTuncertainty() {
         decorrelationUncertainty->SetBinContent(bin, average);
     }
 
-    TFile *outFile = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/decorrelationComparison_ST_smooth.root", "RECREATE");
+    TFile *outFile = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/decorrelationComparison_"+sample+"_smooth.root", "RECREATE");
     outFile->cd();
     decorrelationUncertainty->GetYaxis()->SetRangeUser(0, 0.5);
     decorrelationUncertainty->Write();

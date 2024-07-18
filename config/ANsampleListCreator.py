@@ -78,6 +78,7 @@ class sampleEntity:
       self.br_source = helper.get_br(v['db_name'], '13TeV', self.year, "Source")
       self.lumi = helper.get_lumi(v['db_name'], '13TeV', self.year, kFactor=v.get('kfac', False), Corrections=v.get('corr', False))
       self.xsection = self.pnfs_sum_of_weights / self.lumi
+      self.xsprint = self.xs * self.br
       self.xmlPath = os.path.join(os.environ.get('CMSSW_BASE'), 'src/UHH2/common/UHH2-datasets', helper.get_xml(v['db_name'], '13TeV', self.year))
       self.xmlSource = helper.get_xml(v['db_name'], '13TeV', self.year, "Source")
 
@@ -121,7 +122,7 @@ class tableCreator:
                   print("ERROR: non-constant campaign found!")
                   print("Had: "+campaign)
                   print("Found: "+s.xmlSource.split("/")[2].replace("_", "\\_"))
-              file.write('''} & $'''+str(s.pnfs_sum_of_weights)+'''$ & $'''+str(s.xs)+'''$ & ''')
+              file.write('''} & $'''+str(s.pnfs_sum_of_weights)+'''$ & $'''+str(s.xsprint)+'''$ & ''')
               if( not s.xs_source == ""):
                   if(s.xs_source[:4] == "http"): file.write('''$\\sigma$ taken from \\href{'''+s.xs_source+'''}{here}.''')
                   else: file.write('''$\\sigma$ obtained using '''+s.xs_source+'''.''')

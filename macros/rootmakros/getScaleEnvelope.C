@@ -22,7 +22,7 @@
 
 using namespace std;
 
-void getScaleEnvelope(TString year = "UL18", TString channel = "mu", TString region = "SignalRegion"){
+void getScaleEnvelope(TString year = "UL18", TString channel = "mu", TString region = "ValidationRegion"){
 
   std::cout << "Working on " << year << " for the " << channel << " channel in the " << region << "." << std::endl;
 
@@ -47,7 +47,7 @@ void getScaleEnvelope(TString year = "UL18", TString channel = "mu", TString reg
 
   vector<TString> samples = {"TTbar", "ST"};
   vector<bool> isSignal (samples.size(), false);
-  vector<TString> masspoints = {"700", "800", "900", "1000", "1100", "1200", "1300", "1400", "1500", "1600", "1700", "1800", "1900", "2000", "2250", "2500", "2750"};
+  vector<TString> masspoints = {"700", "800", "900", "1000", "1100", "1200", "1300", "1400", "1500", "1600", "1700", "1800", "1900", "2000", "2250", "2500", "2750", "3000"};
   for (auto mass : masspoints) {
     samples.push_back("TstarTstar_M-" + mass);
     isSignal.push_back(true);

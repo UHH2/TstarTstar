@@ -24,7 +24,7 @@ void checkNonTopFracs() {
     std::vector<int>        styles  =   {   1,                      2,                          3,                  };
 
     TString year                    =   "";           // empty means full UL
-    TString channel                 =   "total";
+    TString channel                 =   "mu";
 
     // constructed variables
     TString path                    =   "/nfs/dust/cms/user/flabe/TstarTstar/data/DNN/" + year + "/hadded/";
@@ -127,8 +127,8 @@ void checkNonTopFracs() {
     legend2->SetBorderSize(0);
     legend2->Draw();
 
-    if (year == "") canvas->SaveAs("plots/nontop_fractions.pdf");
-    else canvas->SaveAs("plots/nontop_fractions_" + year + ".pdf");
+    if (year == "") canvas->SaveAs("plots/nontop_fractions_"+channel+".pdf");
+    else canvas->SaveAs("plots/nontop_fractions_" + year + "_" + channel + ".pdf");
 
 
 }

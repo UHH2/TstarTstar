@@ -43,16 +43,18 @@ TstarTstarGenHists::TstarTstarGenHists(Context & ctx, const string & dirname): H
   book<TH1F>("dR_bquark_jets", "dR_{b jets}", 30, 0, 3);
   book<TH1F>("dR_gluon_jets", "dR_{gluon jets}", 30, 0, 3);
 
-  book<TH1F>("M_tstar_gen", "M_{Tstar} gen", 100, 0, 2000);
-  book<TH1F>("Pt_tstar_gen", "Pt_{Tstar} gen", 100, 0, 3000);
+  book<TH1F>("M_tstar_gen", "M_{Tstar} gen", 200, 0, 4000);
+  book<TH1F>("Pt_tstar_gen", "Pt_{Tstar} gen", 90, 0, 3000);
   book<TH1F>("eta_tstar_gen", "Pt_{Tstar} gen", 40, -4, 4);
   book<TH1F>("M_tstartstar_gen", "M_{TstarTstar} gen", 200, 0, 10000);
 
+  /**
   const int nbinsX = 31;
   double binsX[nbinsX] = {0, 60, 120, 180, 240, 300, 360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140, 1200, 1260, 1320, 1380, 1440, 1500, 1620, 1740, 1860, 2100, 3000};
   const int nbinsY = 17;
   double binsY[nbinsY] = {0, 2000, 3000, 3500, 3750, 4000, 4250, 4500, 4750, 5000, 5250, 5500, 5750, 6000, 6500, 8000, 10000};
   book<TH2F>("Pt_M_tstar_2D_gen", "2D pt M gen", nbinsX, binsX, nbinsY, binsY );
+  **/
   book<TH2F>("Pt_eta_tstar_2D_gen", "2D pt eta gen", 100, 0, 3000, 40, -4, 4);
 
   book<TH1F>("M_ttbar_gen", "M_{ttbar} gen", 100, 0, 5000);
@@ -61,7 +63,6 @@ TstarTstarGenHists::TstarTstarGenHists(Context & ctx, const string & dirname): H
   book<TH1F>("Pt_top_gen_oldbins", "p^{t}_{T} [GeV/c]", 100, 0, 2500);
   book<TH1F>("dR_tstartstar_gen", "dR(Tstar,Tstar)", 30, 0, 6);
   book<TH1F>("dR_ttbar_gen", "dR(top,top)", 30, 0, 6);
-
 
   book<TH1F>("Pt_gluon1_gen", "Pt_{gluon1} gen", 100, 0, 3000);
   book<TH1F>("Pt_gluon2_gen", "Pt_{gluon2} gen", 100, 0, 3000);
@@ -77,6 +78,8 @@ TstarTstarGenHists::TstarTstarGenHists(Context & ctx, const string & dirname): H
   book<TH1F>("Phi_photon1_gen", "#phi_{#gamma1} gen", 100, -3.14, 3.14);
   book<TH1F>("Phi_photon2_gen", "#phi_{#gamma2} gen", 100, -3.14, 3.14);
 
+  book<TH1F>("Pt_lep_gen", "Pt_{lep} gen", 100, 0, 3000);
+
   book<TH1F>("N_photon_gen", "N_{photons} from TstarTstar", 10, 0, 10);
   book<TH1F>("N_gluon_gen", "N_{gluons} from TstarTstar", 10, 0, 10);
   book<TH1F>("dR_tophad_gluon_gen", "dR (tophad, gluon)", 30, 0, 6);
@@ -84,6 +87,8 @@ TstarTstarGenHists::TstarTstarGenHists(Context & ctx, const string & dirname): H
   book<TH1F>("dR_min_gluon_top_gen", "dR^{min}(gluon,top)", 30, 0, 6);
   book<TH1F>("dR_min_photon_top_gen", "dR^{min}(#gamma,top)", 30, 0, 6);
   book<TH1F>("dR_photon_gluon_gen", "dR(#gamma,gluon) (only for Tgamma+Tgluon)", 30, 0, 6);
+
+  book<TH1F>("dR_toplep_lep", "dR (toplep, lep)", 30, 0, 6);
 
   book<TH1F>("dR_hadtop_b_q1", "dR(b, q1)", 30, 0, 6);
   book<TH1F>("dR_hadtop_b_q2", "dR(b, q2)", 30, 0, 6);
@@ -126,12 +131,12 @@ void TstarTstarGenHists::fill(const Event & event){
       antitop = gp;
       found_antitop = true;
     }
-    else if(gp.pdgId() == 600 && (gp.status()==23 || gp.status()==22)){
+    else if( ( gp.pdgId() == 600 || gp.pdgId() == 9000005 ) && (gp.status()==23 || gp.status()==22)){
       tstar = gp;
       if(found_tstar) std::cout << "Error: found two T*" << std::endl;
       found_tstar = true;
     }
-    else if(gp.pdgId() == -600 && (gp.status()==23 || gp.status()==22)){
+    else if( ( gp.pdgId() == -600 || gp.pdgId() == -9000005 ) && (gp.status()==23 || gp.status()==22)){
       antitstar = gp;
       if(found_antitstar) std::cout << "Error: found two anti T*" << std::endl;
       found_antitstar = true;
@@ -160,7 +165,7 @@ void TstarTstarGenHists::fill(const Event & event){
     }
   }
 
-  if(!found_tstar || !found_antitstar) return;
+  //if(!found_tstar || !found_antitstar) return;
   if(!found_top || !found_antitop) return;
 
   /**
@@ -205,7 +210,7 @@ void TstarTstarGenHists::fill(const Event & event){
   if(found_tstar && found_antitstar){
     float m_tstartstar = inv_mass(tstar.v4()+antitstar.v4());
     hist("M_tstartstar_gen")->Fill(m_tstartstar, weight);
-    ((TH2F*)hist("Pt_M_tstar_2D_gen"))->Fill(m_tstartstar, tstar.pt(), weight);
+    //((TH2F*)hist("Pt_M_tstar_2D_gen"))->Fill(m_tstartstar, tstar.pt(), weight);
   }
   float m_ttbar = inv_mass(top.v4() + antitop.v4());
   hist("M_ttbar_gen")->Fill(m_ttbar, weight);
@@ -292,6 +297,7 @@ void TstarTstarGenHists::fill(const Event & event){
 
   GenParticle toplep = ttbargen.TopLep();
   GenParticle tophad = ttbargen.TopHad();
+  GenParticle lep = ttbargen.ChargedLepton();
 
   GenParticle gluonlep, gluonhad;
   if(toplep.mother1() ==  gluon1.mother1()){
@@ -305,8 +311,12 @@ void TstarTstarGenHists::fill(const Event & event){
 
   double dR_toplep_gluon = deltaR(toplep, gluonlep);
   double dR_tophad_gluon = deltaR(tophad, gluonhad);
+  double dR_toplep_lep = deltaR(toplep, lep);
   hist("dR_toplep_gluon_gen")->Fill(dR_toplep_gluon,weight);
   hist("dR_tophad_gluon_gen")->Fill(dR_tophad_gluon,weight);
+  hist("dR_toplep_lep")->Fill(dR_toplep_lep,weight);
+
+  hist("Pt_lep_gen")->Fill(lep.pt(),weight);
 
   double dR_hadtop_b_q1 = deltaR(ttbargen.BHad(), ttbargen.Q1());
   double dR_hadtop_b_q2 = deltaR(ttbargen.BHad(), ttbargen.Q2());

@@ -17,17 +17,48 @@ TstarTstarSignalRegionHists::TstarTstarSignalRegionHists(Context & ctx, const st
 
   if(ctx.get("debug", "<not set>") == "true") debug = true;
 
-  needsOtherMCweightHandling = ctx.get("dataset_version").find("TstarTstar") != std::string::npos;
+  std::vector<TString> samples_that_need_other_mcweight_handling = {"TstarTstar", "DYJets", "WJets", "QCD_HT"};
+  needsOtherMCweightHandling = false;
+  for (const auto sample : samples_that_need_other_mcweight_handling) {
+    if (ctx.get("dataset_version").find(sample) != std::string::npos) needsOtherMCweightHandling = true;
+  }
   if(needsOtherMCweightHandling && debug) std::cout << "We are signal so we need other idices" << std::endl;
 
   // Histogram containing decorrelation uncertainty
   TString sample_string = "total";      // won't be used, just to have it filled for mc only results :
-  if(is_MC) { // TODO put this into a module at some point
+  if(is_MC) { 
     if(ctx.get("dataset_version").find("TT") != std::string::npos) sample_string = "TTbar";
     else if(ctx.get("dataset_version").find("ST") != std::string::npos) sample_string = "ST";
   }
   TFile *decorrelationUncertaintyFile = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/decorrelationComparison_" + sample_string + "_smooth.root");
   decorrelationUncertainty = (TH1*)decorrelationUncertaintyFile->Get("decorrelation_uncertainty");
+
+  // histograms for yield correction
+  h_flag_muonevent = ctx.get_handle<bool>("is_muevt");
+  TString year = ctx.get("year", "<not set>");
+  if(year == "<not set>"){
+    if(ctx.get("dataset_version").find("2016") != std::string::npos) year = "2016";
+    else if(ctx.get("dataset_version").find("2017") != std::string::npos) year = "2017";
+    else if(ctx.get("dataset_version").find("2018") != std::string::npos) year = "2018";
+    else if(ctx.get("dataset_version").find("UL16preVFP") != std::string::npos) year = "UL16preVFP";
+    else if(ctx.get("dataset_version").find("UL16postVFP") != std::string::npos) year = "UL16postVFP";
+    else if(ctx.get("dataset_version").find("UL17") != std::string::npos) year = "UL17";
+    else if(ctx.get("dataset_version").find("UL18") != std::string::npos) year = "UL18";
+    else throw "No year found in dataset name!";
+  }
+  sample_string = ""; // we'll get all here, but only ST and TTbar are used
+  if(ctx.get("dataset_version").find("TT") != std::string::npos) sample_string = "TTbar";
+  else if(ctx.get("dataset_version").find("ST") != std::string::npos) sample_string = "ST";
+  else if(ctx.get("dataset_version").find("WJets") != std::string::npos) sample_string = "WJets";
+  else if(ctx.get("dataset_version").find("QCD") != std::string::npos) sample_string = "QCD";
+  else if(ctx.get("dataset_version").find("Diboson") != std::string::npos) sample_string = "VV";
+  else if(ctx.get("dataset_version").find("DY") != std::string::npos) sample_string = "DYJets";
+  else if(ctx.get("dataset_version").find("TstarTstarToTgammaTgamma") != std::string::npos) sample_string = "TstarTstar";
+  else if(ctx.get("dataset_version").find("TstarTstarToTgluonTgluon_Spin32") != std::string::npos) sample_string = "TstarTstar_Spin32";
+  TFile *btagyield_eleFile = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/btagyield/btagYieldUncs_" + year + "_ele.root");
+  btagyield_ele = (TH1*)btagyield_eleFile->Get(sample_string);
+  TFile *btagyield_muFile = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/btagyield/btagYieldUncs_" + year + "_mu.root");
+  btagyield_mu = (TH1*)btagyield_muFile->Get(sample_string);
 
   // weight handles
 
@@ -110,7 +141,7 @@ TstarTstarSignalRegionHists::TstarTstarSignalRegionHists(Context & ctx, const st
   variations = {
     "pt_ST_topPt", "pt_ST_pu", "pt_ST_prefiring", "pt_ST_btagging_total", "pt_ST_btagging_hf", "pt_ST_btagging_hfstats1", "pt_ST_btagging_hfstats2", "pt_ST_btagging_lf",
     "pt_ST_btagging_lfstats1", "pt_ST_btagging_lfstats2", "pt_ST_btagging_cferr1", "pt_ST_btagging_cferr2", "pt_ST_sfelec_id", "pt_ST_sfelec_trigger", "pt_ST_sfelec_reco",
-    "pt_ST_sfmu_id", "pt_ST_sfmu_iso", "pt_ST_sfmu_trigger", "pt_ST_decorrelation",
+    "pt_ST_sfmu_id", "pt_ST_sfmu_iso", "pt_ST_sfmu_trigger", "pt_ST_decorrelation", "pt_ST_btagYield",
   };
 
   for (const auto variation : variations) {
@@ -143,7 +174,6 @@ TstarTstarSignalRegionHists::TstarTstarSignalRegionHists(Context & ctx, const st
   book<TH1F>("pt_ST_murmuf_nonedown", "S_{T} [GeV]", nbins-1, bins);
   book<TH1F>("pt_ST_murmuf_downnone", "S_{T} [GeV]", nbins-1, bins);
   book<TH1F>("pt_ST_murmuf_downdown", "S_{T} [GeV]", nbins-1, bins);
-
 }
 
 
@@ -257,7 +287,17 @@ void TstarTstarSignalRegionHists::fill(const Event & event){
   hist("pt_ST_btagging_totalUp")->Fill(st, weight * (1 + sqrt(total_greater)));
   hist("pt_ST_btagging_totalDown")->Fill(st, weight * (1 - sqrt(total_smaller)));
 
-
+  // b-tagging yield
+  if(event.get(h_flag_muonevent)) {
+    // fetching the event weight based on muon pt
+    double this_weight = btagyield_mu->GetBinContent( btagyield_mu->GetXaxis()->FindBin(event.muons->at(0).pt()) );
+    hist("pt_ST_btagYieldUp")->Fill(st, weight * this_weight);
+    hist("pt_ST_btagYieldDown")->Fill(st, weight / this_weight);
+  } else {
+    double this_weight = btagyield_ele->GetBinContent( btagyield_ele->GetXaxis()->FindBin(event.electrons->at(0).pt()) );
+    hist("pt_ST_btagYieldUp")->Fill(st, weight * this_weight);
+    hist("pt_ST_btagYieldDown")->Fill(st, weight / this_weight);
+  }
 
   if(debug) cout << "Starting ele..." << endl;
   // sfelec_id

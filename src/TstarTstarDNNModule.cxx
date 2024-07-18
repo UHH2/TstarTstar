@@ -23,6 +23,7 @@
 #include "UHH2/TstarTstar/include/TstarTstarDDTHists.h"
 #include "UHH2/TstarTstar/include/ElecTriggerSF.h"
 #include "UHH2/TstarTstar/include/TstarTstarSelections.h"
+#include "UHH2/TstarTstar/include/VetoMapApplication.h"
 
 
 // other
@@ -51,6 +52,9 @@ private:
   std::unique_ptr<AnalysisModule> sf_ele_trigger;                  // needed to re-apply electron trigger SFs in case they changed since sel
   std::unique_ptr<AnalysisModule> ttgenprod;
   std::unique_ptr<AnalysisModule> TopPtReweighting;                // re-running this here just to get the event weight :)
+  std::unique_ptr<AnalysisModule> MCScaleVariations;               // re-running this here just to get the event weight :)
+
+  //std::unique_ptr<AnalysisModule> VetoMapApplicatorModule;
 
   // ##### Histograms #####
 
@@ -89,6 +93,9 @@ private:
   std::unique_ptr<Hists> h_SignalRegion_datadriven_yearUp_total,      h_SignalRegion_datadriven_yearDown_total;
   std::unique_ptr<Hists> h_SignalRegion_datadriven_yearUp_mu,         h_SignalRegion_datadriven_yearDown_mu;
   std::unique_ptr<Hists> h_SignalRegion_datadriven_yearUp_ele,        h_SignalRegion_datadriven_yearDown_ele;
+  std::unique_ptr<Hists> h_SignalRegion_datadriven_fitstatUp_total,      h_SignalRegion_datadriven_fitstatDown_total;
+  std::unique_ptr<Hists> h_SignalRegion_datadriven_fitstatUp_mu,         h_SignalRegion_datadriven_fitstatDown_mu;
+  std::unique_ptr<Hists> h_SignalRegion_datadriven_fitstatUp_ele,        h_SignalRegion_datadriven_fitstatDown_ele;
 
   // and the same for the validation region
   std::unique_ptr<Hists> h_ValidationRegion_datadriven_FuncUp_total,     h_ValidationRegion_datadriven_FuncDown_total;
@@ -100,6 +107,13 @@ private:
   std::unique_ptr<Hists> h_ValidationRegion_datadriven_yearUp_total,     h_ValidationRegion_datadriven_yearDown_total;
   std::unique_ptr<Hists> h_ValidationRegion_datadriven_yearUp_mu,        h_ValidationRegion_datadriven_yearDown_mu;
   std::unique_ptr<Hists> h_ValidationRegion_datadriven_yearUp_ele,       h_ValidationRegion_datadriven_yearDown_ele;
+  std::unique_ptr<Hists> h_ValidationRegion_datadriven_fitstatUp_total,     h_ValidationRegion_datadriven_fitstatDown_total;
+  std::unique_ptr<Hists> h_ValidationRegion_datadriven_fitstatUp_mu,        h_ValidationRegion_datadriven_fitstatDown_mu;
+  std::unique_ptr<Hists> h_ValidationRegion_datadriven_fitstatUp_ele,       h_ValidationRegion_datadriven_fitstatDown_ele;
+
+  //std::unique_ptr<Hists> h_vetomap, h_vetomap_ele, h_vetomap_mu;
+
+  //std::unique_ptr<Hists> h_DNN_vetomap, h_hists_fakeSR_veto, h_hists_fakeSR_noveto;
 
   // some histograms to test various DDT working points
   std::unique_ptr<uhh2::TstarTstarDDTHists> h_DDTtestHists;  
@@ -107,6 +121,8 @@ private:
   // ###### Handles ######
   uhh2::Event::Handle<double> h_evt_weight;
   uhh2::Event::Handle<TTbarGen> h_ttbargen;
+
+  uhh2::Event::Handle< std::vector<Jet> > h_CHS_matched;
 
   uhh2::Event::Handle<bool> h_trigger_decision;
   uhh2::Event::Handle<int> h_flag_toptagevent;
@@ -150,11 +166,20 @@ private:
   TF1 * backgroundEstimationFunctionBtagUp_SR_mu,    * backgroundEstimationFunctionBtagUp_VR_mu;
   TF1 * backgroundEstimationFunctionBtagDown_SR_mu,  * backgroundEstimationFunctionBtagDown_VR_mu;
 
+  // alternate functions for stat variation are histograms instead
+  TH1D * backgroundEstimationFunctionFitStatUp_SR_ele,    * backgroundEstimationFunctionFitStatUp_VR_ele;
+  TH1D * backgroundEstimationFunctionFitStatDown_SR_ele,  * backgroundEstimationFunctionFitStatDown_VR_ele;
+  TH1D * backgroundEstimationFunctionFitStatUp_SR_mu,    * backgroundEstimationFunctionFitStatUp_VR_mu;
+  TH1D * backgroundEstimationFunctionFitStatDown_SR_mu,  * backgroundEstimationFunctionFitStatDown_VR_mu;
+
   // DDT function(s)
   std::vector<TF1*> DDTFunctions;
   TF1* BestDDTFunction;
 
   unique_ptr<Selection> twodcut_sel;
+
+  // btag yield, for re-application
+  TH2D *eventYieldFactors_old, *eventYieldFactors_mu, *eventYieldFactors_ele;
 
 };
 
@@ -197,6 +222,11 @@ TstarTstarDNNModule::TstarTstarDNNModule(Context & ctx){
 
   TopPtReweighting.reset( new TopPtReweight(ctx, 0.0615, -0.0005, "ttbargen", "weight_ttbar", false) ); // just rerunning to get the weight, not applying!
 
+  // this will set the mc scale variation weights
+  MCScaleVariations.reset(new MCScaleVariation(ctx) );
+
+  // veto maps
+  //VetoMapApplicatorModule.reset(new VetoMapApplicator(ctx));
 
   // 2. set up histograms:
 
@@ -209,18 +239,21 @@ TstarTstarDNNModule::TstarTstarDNNModule(Context & ctx){
   h_hists_VR.reset(new TstarTstarHists(ctx, "hists_VR"));
   h_hists_btagCR.reset(new TstarTstarHists(ctx, "hists_btagCR"));
   h_hists_ttbarCR.reset(new TstarTstarHists(ctx, "hists_ttbarCR"));
+  //h_vetomap.reset(new TstarTstarHists(ctx, "hists_vetomap"));
 
   h_crosscheck_ele.reset(new TstarTstarHists(ctx, "crosscheck_ele"));
   h_hists_SR_ele.reset(new TstarTstarHists(ctx, "hists_SR_ele"));
   h_hists_VR_ele.reset(new TstarTstarHists(ctx, "hists_VR_ele"));
   h_hists_btagCR_ele.reset(new TstarTstarHists(ctx, "hists_btagCR_ele"));
   h_hists_ttbarCR_ele.reset(new TstarTstarHists(ctx, "hists_ttbarCR_ele"));
+  //h_vetomap_ele.reset(new TstarTstarHists(ctx, "hists_vetomap_ele"));
 
   h_crosscheck_mu.reset(new TstarTstarHists(ctx, "crosscheck_mu"));
   h_hists_SR_mu.reset(new TstarTstarHists(ctx, "hists_SR_mu"));
   h_hists_VR_mu.reset(new TstarTstarHists(ctx, "hists_VR_mu"));
   h_hists_btagCR_mu.reset(new TstarTstarHists(ctx, "hists_btagCR_mu"));
   h_hists_ttbarCR_mu.reset(new TstarTstarHists(ctx, "hists_ttbarCR_mu"));
+  //h_vetomap_mu.reset(new TstarTstarHists(ctx, "hists_vetomap_mu"));
 
   h_hists_VR_ele_highHT.reset(new TstarTstarHists(ctx, "hists_VR_ele_highHT"));
   h_hists_VR_ele_highST.reset(new TstarTstarHists(ctx, "hists_VR_ele_highST"));
@@ -246,6 +279,10 @@ TstarTstarDNNModule::TstarTstarDNNModule(Context & ctx){
   h_DNN.reset(new TstarTstarDNNHists(ctx, "DNN"));
   h_DNN_DDT.reset(new TstarTstarDNNHists(ctx, "DNN_DDT"));
   h_DNN_btagCR.reset(new TstarTstarDNNHists(ctx, "DNN_btagCR"));
+  //h_DNN_vetomap.reset(new TstarTstarDNNHists(ctx, "DNN_vetomap"));
+
+  //h_hists_fakeSR_noveto.reset(new TstarTstarHists(ctx, "hists_fakeSR_noveto"));
+  //h_hists_fakeSR_veto.reset(new TstarTstarHists(ctx, "hists_fakeSR_veto"));
 
   // region plots
   // the TstarTstarSignalRegionHists has all systematic variations included
@@ -279,6 +316,21 @@ TstarTstarDNNModule::TstarTstarDNNModule(Context & ctx){
   h_SignalRegion_datadriven_FuncDown_ele.reset(new TstarTstarSignalRegionHists(ctx, "SignalRegion_datadriven_FuncDown_ele"));
   h_ValidationRegion_datadriven_FuncUp_ele.reset(new TstarTstarSignalRegionHists(ctx, "ValidationRegion_datadriven_FuncUp_ele")); // using SR hists here, although it is not
   h_ValidationRegion_datadriven_FuncDown_ele.reset(new TstarTstarSignalRegionHists(ctx, "ValidationRegion_datadriven_FuncDown_ele")); // using SR hists here, although it is not
+
+  h_SignalRegion_datadriven_fitstatUp_mu.reset(new TstarTstarSignalRegionHists(ctx, "SignalRegion_datadriven_fitstatUp_mu"));
+  h_SignalRegion_datadriven_fitstatDown_mu.reset(new TstarTstarSignalRegionHists(ctx, "SignalRegion_datadriven_fitstatDown_mu"));
+  h_ValidationRegion_datadriven_fitstatUp_mu.reset(new TstarTstarSignalRegionHists(ctx, "ValidationRegion_datadriven_fitstatUp_mu")); // using SR hists here, although it is not
+  h_ValidationRegion_datadriven_fitstatDown_mu.reset(new TstarTstarSignalRegionHists(ctx, "ValidationRegion_datadriven_fitstatDown_mu")); // using SR hists here, although it is not
+
+  h_SignalRegion_datadriven_fitstatUp_total.reset(new TstarTstarSignalRegionHists(ctx, "SignalRegion_datadriven_fitstatUp_total"));
+  h_SignalRegion_datadriven_fitstatDown_total.reset(new TstarTstarSignalRegionHists(ctx, "SignalRegion_datadriven_fitstatDown_total"));
+  h_ValidationRegion_datadriven_fitstatUp_total.reset(new TstarTstarSignalRegionHists(ctx, "ValidationRegion_datadriven_fitstatUp_total")); // using SR hists here, although it is not
+  h_ValidationRegion_datadriven_fitstatDown_total.reset(new TstarTstarSignalRegionHists(ctx, "ValidationRegion_datadriven_fitstatDown_total")); // using SR hists here, although it is not
+
+  h_SignalRegion_datadriven_fitstatUp_ele.reset(new TstarTstarSignalRegionHists(ctx, "SignalRegion_datadriven_fitstatUp_ele"));
+  h_SignalRegion_datadriven_fitstatDown_ele.reset(new TstarTstarSignalRegionHists(ctx, "SignalRegion_datadriven_fitstatDown_ele"));
+  h_ValidationRegion_datadriven_fitstatUp_ele.reset(new TstarTstarSignalRegionHists(ctx, "ValidationRegion_datadriven_fitstatUp_ele")); // using SR hists here, although it is not
+  h_ValidationRegion_datadriven_fitstatDown_ele.reset(new TstarTstarSignalRegionHists(ctx, "ValidationRegion_datadriven_fitstatDown_ele")); // using SR hists here, although it is not
 
   h_SignalRegion_datadriven_BtagUp_total.reset(new TstarTstarSignalRegionHists(ctx, "SignalRegion_datadriven_BtagUp_total"));
   h_SignalRegion_datadriven_BtagDown_total.reset(new TstarTstarSignalRegionHists(ctx, "SignalRegion_datadriven_BtagDown_total"));
@@ -330,7 +382,6 @@ TstarTstarDNNModule::TstarTstarDNNModule(Context & ctx){
     // path definitions
     TString path = "/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/bgest/";
 
-
     // ##### filenames #####
     // nominal files
     TString filename_nominal_SR_ele = "alphaFunction_HOTVR__SR_ele.root";
@@ -347,6 +398,12 @@ TstarTstarDNNModule::TstarTstarDNNModule(Context & ctx){
     TString filename_btagDown_SR_mu = "alphaFunction_HOTVR__SR_mu_btagging_totalDown.root";
     TString filename_btagUp_VR_mu = "alphaFunction_HOTVR__VR_mu_btagging_totalUp.root";
     TString filename_btagDown_VR_mu = "alphaFunction_HOTVR__VR_mu_btagging_totalDown.root";
+
+    // fitstat variations
+    TString filename_nominal_SR_ele_fitstat = "alphaFunction_HOTVR__SR_ele_fitstat.root";
+    TString filename_nominal_VR_ele_fitstat = "alphaFunction_HOTVR__VR_ele_fitstat.root";
+    TString filename_nominal_SR_mu_fitstat = "alphaFunction_HOTVR__SR_mu_fitstat.root";
+    TString filename_nominal_VR_mu_fitstat = "alphaFunction_HOTVR__VR_mu_fitstat.root";
 
 
     // ##### functions #####
@@ -388,6 +445,21 @@ TstarTstarDNNModule::TstarTstarDNNModule(Context & ctx){
     backgroundEstimationFunctionBtagDown_VR_ele = (TF1*)file_btagDown_VR_ele->Get("fit_mean");
     TFile *file_btagDown_VR_mu = new TFile(path+filename_btagDown_VR_mu);
     backgroundEstimationFunctionBtagDown_VR_mu = (TF1*)file_btagDown_VR_mu->Get("fit_mean");
+
+    // fitstat variations
+    TFile *file_fitstat_VR_ele = new TFile(path+filename_nominal_VR_ele_fitstat);
+    backgroundEstimationFunctionFitStatUp_VR_ele = (TH1D*)file_fitstat_VR_ele->Get("fitstat_up");
+    backgroundEstimationFunctionFitStatDown_VR_ele = (TH1D*)file_fitstat_VR_ele->Get("fitstat_down");
+    TFile *file_fitstat_VR_mu = new TFile(path+filename_nominal_VR_mu_fitstat);
+    backgroundEstimationFunctionFitStatUp_VR_mu = (TH1D*)file_fitstat_VR_mu->Get("fitstat_up");
+    backgroundEstimationFunctionFitStatDown_VR_mu = (TH1D*)file_fitstat_VR_mu->Get("fitstat_down");
+    TFile *file_fitstat_SR_ele = new TFile(path+filename_nominal_SR_ele_fitstat);
+    backgroundEstimationFunctionFitStatUp_SR_ele = (TH1D*)file_fitstat_SR_ele->Get("fitstat_up");
+    backgroundEstimationFunctionFitStatDown_SR_ele = (TH1D*)file_fitstat_SR_ele->Get("fitstat_down");
+    TFile *file_fitstat_SR_mu = new TFile(path+filename_nominal_SR_mu_fitstat);
+    backgroundEstimationFunctionFitStatUp_SR_mu = (TH1D*)file_fitstat_SR_mu->Get("fitstat_up");
+    backgroundEstimationFunctionFitStatDown_SR_mu = (TH1D*)file_fitstat_SR_mu->Get("fitstat_down");
+  
 
 
     // finally, the purity
@@ -437,6 +509,8 @@ TstarTstarDNNModule::TstarTstarDNNModule(Context & ctx){
   TString path = "/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/";
   TString bestFunction = "0p3";
   TString filename_base = "DDTfunc_";
+
+  h_CHS_matched = ctx.get_handle<vector<Jet>>("CHS_matched");
   
   // getting the best function
   TFile *f = new TFile(path+filename_base+bestFunction+".root");
@@ -449,8 +523,36 @@ TstarTstarDNNModule::TstarTstarDNNModule(Context & ctx){
     DDTFunctions.push_back(DDTFunction);
   }
 
-  // TODO remove 2D
+  // just a 2d with tighter cuts
   twodcut_sel.reset(new TwoDCut(0.4, 50.0));  // doubling the ptrel
+
+
+  // for re-application of the btagging yield sgs
+  if(is_MC) { // TODO put this into a module at some point
+    TString sample_string = "";
+    if(ctx.get("dataset_version").find("TT") != std::string::npos) sample_string = "TTbar";
+    else if(ctx.get("dataset_version").find("ST") != std::string::npos) sample_string = "ST";
+    else if(ctx.get("dataset_version").find("WJets") != std::string::npos) sample_string = "WJets";
+    else if(ctx.get("dataset_version").find("QCD") != std::string::npos) sample_string = "QCD";
+    else if(ctx.get("dataset_version").find("Diboson") != std::string::npos) sample_string = "VV";
+    else if(ctx.get("dataset_version").find("DY") != std::string::npos) sample_string = "DYJets";
+    else if(ctx.get("dataset_version").find("TstarTstarToTgammaTgamma") != std::string::npos) sample_string = "TstarTstar";
+    else if(ctx.get("dataset_version").find("TstarTstarToTgluonTgluon_Spin32") != std::string::npos) sample_string = "TstarTstar_Spin32";
+    if(debug) std::cout << "Re-applying 2D b-taggin yield SFs for " << sample_string << std::endl;
+
+    TString path = "/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/btagyield/";
+    
+    TFile *fold = new TFile(path + "/oldfiles/btagYieldSFs_"+year+".root");
+    if(sample_string != "") eventYieldFactors_old = (TH2D*)fold->Get(sample_string);
+
+    TFile *fmu = new TFile(path + "/btagYieldSFs_"+year+"_mu.root");
+    if(sample_string != "") eventYieldFactors_mu = (TH2D*)fmu->Get(sample_string);
+
+    TFile *fele = new TFile(path + "/btagYieldSFs_"+year+"_ele.root");
+    if(sample_string != "") eventYieldFactors_ele = (TH2D*)fele->Get(sample_string);
+
+    else throw std::runtime_error("Error: can not determine sample type for btagging yield SFs.");
+  }
 
 }
 
@@ -477,12 +579,39 @@ bool TstarTstarDNNModule::process(Event & event) {
     sf_ele_trigger->process(event);
   }
 
+  // b-tagging yield correction re-application
+  // done as a function of AK4 HT and N(AK4)
+  if(is_MC) {
+    double ht = 0.;
+    for(const auto & jet : *event.jets) ht += jet.pt();
+    if(ht >= 4000.) ht = 3999.9;
+
+    double btaggingYieldWeight_old = eventYieldFactors_old->GetBinContent( eventYieldFactors_old->GetXaxis()->FindBin(ht),  eventYieldFactors_old->GetYaxis()->FindBin(event.jets->size()) );
+    double btaggingYieldWeight_mu = eventYieldFactors_mu->GetBinContent( eventYieldFactors_mu->GetXaxis()->FindBin(ht),  eventYieldFactors_mu->GetYaxis()->FindBin(event.jets->size()) );
+    double btaggingYieldWeight_ele = eventYieldFactors_ele->GetBinContent( eventYieldFactors_ele->GetXaxis()->FindBin(ht),  eventYieldFactors_ele->GetYaxis()->FindBin(event.jets->size()) );
+    if(btaggingYieldWeight_old != 0) {
+      event.weight /= btaggingYieldWeight_old;
+      if(event.get(h_flag_muonevent)) {
+        event.weight *= btaggingYieldWeight_mu;
+      } else {
+        event.weight *= btaggingYieldWeight_ele;
+      }
+    } else {
+      std::cout << "Old btagging yield weight was 0 for this event!" << std::endl;
+    }
+    
+  }
+
   if(is_MC) ttgenprod->process(event);
   TopPtReweighting->process(event); // will set the weight 
 
+  // run MCscale just to get the handles filled
+  // make sure that the config file has "nominal" for this weight!
+  MCScaleVariations->process(event); // writing MC weights
+
   // apply spin reweighting
-  if(!(TstarTstarSpinSwitcher->process(event))) return false; // this will reweight, but only if set so in config file
-  event.set(h_evt_weight, event.weight); // we'll use this later, so need to update
+  //if(!(TstarTstarSpinSwitcher->process(event))) return false; // this will reweight, but only if set so in config file
+  //event.set(h_evt_weight, event.weight); // we'll use this later, so need to update
 
   // set primary lepton
   reco_primlep->process(event);
@@ -491,13 +620,13 @@ bool TstarTstarDNNModule::process(Event & event) {
   // can be removed if its not failing in the next running iteration
   BTag bJetID = BTag(BTag::algo::DEEPJET, BTag::wp::WP_MEDIUM);
   bool pass_btagcut = false;
-  for (const auto & jet: *event.jets){
+  for (const auto & jet: event.get(h_CHS_matched)){
     if(bJetID(jet, event)) pass_btagcut = true;
   }
   assert(pass_btagcut == event.get(h_is_btagevent));
 
   // do additional ST cut
-  if(event.get(h_ST_HOTVR) < 600) return false;
+  //if(event.get(h_ST_HOTVR) < 600) return false;
 
   // filling crosscheck histograms after all initial steps are done
   if(event.get(h_is_btagevent)) {
@@ -510,7 +639,6 @@ bool TstarTstarDNNModule::process(Event & event) {
     }
 
   }
-
 
   // ################
   // ### DNN Part ###
@@ -555,6 +683,28 @@ bool TstarTstarDNNModule::process(Event & event) {
 
   if(event.get(h_is_btagevent)) h_DNN_DDT->fill(event);
 
+  // applying veto maps
+  /**
+  if(!(VetoMapApplicatorModule->process(event))) return false;
+  if(event.get(h_is_btagevent)) {
+    h_vetomap->fill(event);
+    if(event.get(h_flag_muonevent)) {
+      h_vetomap_mu->fill(event);
+    } else {
+      h_vetomap_ele->fill(event);
+    }
+  }
+  if(event.get(h_is_btagevent)) {
+    
+    h_DNN_vetomap->fill(event);
+
+    if(event.get(h_DDT_score) > 0) {
+      h_hists_fakeSR_veto->fill(event);
+    }
+
+  }
+
+  **/
 
   // ##################################
   // ### background estimation part ###
@@ -587,6 +737,15 @@ bool TstarTstarDNNModule::process(Event & event) {
   double transfer_weight_btagDown_SR_mu = 1;
   double transfer_weight_btagDown_VR_mu = 1;
 
+  double transfer_weight_fitstatUp_SR_ele = 1;
+  double transfer_weight_fitstatUp_SR_mu = 1;
+  double transfer_weight_fitstatUp_VR_ele = 1;
+  double transfer_weight_fitstatUp_VR_mu = 1;
+  double transfer_weight_fitstatDown_SR_ele = 1;
+  double transfer_weight_fitstatDown_SR_mu = 1;
+  double transfer_weight_fitstatDown_VR_ele = 1;
+  double transfer_weight_fitstatDown_VR_mu = 1;
+
   double purity_value_mu = 1;
   double purity_value_ele = 1;
   double purity_value_BtagUp_mu = 1;
@@ -601,28 +760,41 @@ bool TstarTstarDNNModule::process(Event & event) {
 
     if(debug) cout << "Doing datadriven BG estimation" << endl;
 
-    transfer_weight_nominal_SR_ele = backgroundEstimationFunctionNominal_SR_ele->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_nominal_SR_mu = backgroundEstimationFunctionNominal_SR_mu->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_nominal_VR_ele = backgroundEstimationFunctionNominal_VR_ele->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_nominal_VR_mu = backgroundEstimationFunctionNominal_VR_mu->Eval(event.get(h_ST_HOTVR));
+    // handle overflow
+    double st_for_findbin = event.get(h_ST_HOTVR);
+    if (st_for_findbin > 6000) {st_for_findbin = 5999;} 
 
-    transfer_weight_funcUp_SR_ele = backgroundEstimationFunctionFuncUp_SR_ele->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_funcUp_SR_mu = backgroundEstimationFunctionFuncUp_SR_mu->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_funcUp_VR_ele = backgroundEstimationFunctionFuncUp_VR_ele->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_funcUp_VR_mu = backgroundEstimationFunctionFuncUp_VR_mu->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_funcDown_SR_ele = backgroundEstimationFunctionFuncDown_SR_ele->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_funcDown_SR_mu = backgroundEstimationFunctionFuncDown_SR_mu->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_funcDown_VR_ele = backgroundEstimationFunctionFuncDown_VR_ele->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_funcDown_VR_mu = backgroundEstimationFunctionFuncDown_VR_mu->Eval(event.get(h_ST_HOTVR));
+    transfer_weight_nominal_SR_ele = backgroundEstimationFunctionNominal_SR_ele->Eval(st_for_findbin);
+    transfer_weight_nominal_SR_mu = backgroundEstimationFunctionNominal_SR_mu->Eval(st_for_findbin);
+    transfer_weight_nominal_VR_ele = backgroundEstimationFunctionNominal_VR_ele->Eval(st_for_findbin);
+    transfer_weight_nominal_VR_mu = backgroundEstimationFunctionNominal_VR_mu->Eval(st_for_findbin);
 
-    transfer_weight_btagUp_SR_ele = backgroundEstimationFunctionBtagUp_SR_ele->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_btagUp_SR_mu = backgroundEstimationFunctionBtagUp_SR_mu->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_btagUp_VR_ele = backgroundEstimationFunctionBtagUp_VR_ele->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_btagUp_VR_mu = backgroundEstimationFunctionBtagUp_VR_mu->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_btagDown_SR_ele = backgroundEstimationFunctionBtagDown_SR_ele->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_btagDown_SR_mu = backgroundEstimationFunctionBtagDown_SR_mu->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_btagDown_VR_ele = backgroundEstimationFunctionBtagDown_VR_ele->Eval(event.get(h_ST_HOTVR));
-    transfer_weight_btagDown_VR_mu = backgroundEstimationFunctionBtagDown_VR_mu->Eval(event.get(h_ST_HOTVR));
+    transfer_weight_funcUp_SR_ele = backgroundEstimationFunctionFuncUp_SR_ele->Eval(st_for_findbin);
+    transfer_weight_funcUp_SR_mu = backgroundEstimationFunctionFuncUp_SR_mu->Eval(st_for_findbin);
+    transfer_weight_funcUp_VR_ele = backgroundEstimationFunctionFuncUp_VR_ele->Eval(st_for_findbin);
+    transfer_weight_funcUp_VR_mu = backgroundEstimationFunctionFuncUp_VR_mu->Eval(st_for_findbin);
+    transfer_weight_funcDown_SR_ele = backgroundEstimationFunctionFuncDown_SR_ele->Eval(st_for_findbin);
+    transfer_weight_funcDown_SR_mu = backgroundEstimationFunctionFuncDown_SR_mu->Eval(st_for_findbin);
+    transfer_weight_funcDown_VR_ele = backgroundEstimationFunctionFuncDown_VR_ele->Eval(st_for_findbin);
+    transfer_weight_funcDown_VR_mu = backgroundEstimationFunctionFuncDown_VR_mu->Eval(st_for_findbin);
+
+    transfer_weight_btagUp_SR_ele = backgroundEstimationFunctionBtagUp_SR_ele->Eval(st_for_findbin);
+    transfer_weight_btagUp_SR_mu = backgroundEstimationFunctionBtagUp_SR_mu->Eval(st_for_findbin);
+    transfer_weight_btagUp_VR_ele = backgroundEstimationFunctionBtagUp_VR_ele->Eval(st_for_findbin);
+    transfer_weight_btagUp_VR_mu = backgroundEstimationFunctionBtagUp_VR_mu->Eval(st_for_findbin);
+    transfer_weight_btagDown_SR_ele = backgroundEstimationFunctionBtagDown_SR_ele->Eval(st_for_findbin);
+    transfer_weight_btagDown_SR_mu = backgroundEstimationFunctionBtagDown_SR_mu->Eval(st_for_findbin);
+    transfer_weight_btagDown_VR_ele = backgroundEstimationFunctionBtagDown_VR_ele->Eval(st_for_findbin);
+    transfer_weight_btagDown_VR_mu = backgroundEstimationFunctionBtagDown_VR_mu->Eval(st_for_findbin);
+
+    transfer_weight_fitstatUp_SR_ele = backgroundEstimationFunctionFitStatUp_SR_ele->GetBinContent( backgroundEstimationFunctionFitStatUp_SR_ele->FindBin(st_for_findbin) );
+    transfer_weight_fitstatUp_SR_mu = backgroundEstimationFunctionFitStatUp_SR_mu->GetBinContent( backgroundEstimationFunctionFitStatUp_SR_mu->FindBin(st_for_findbin) );
+    transfer_weight_fitstatUp_VR_ele = backgroundEstimationFunctionFitStatUp_VR_ele->GetBinContent( backgroundEstimationFunctionFitStatUp_VR_ele->FindBin(st_for_findbin) );
+    transfer_weight_fitstatUp_VR_mu = backgroundEstimationFunctionFitStatUp_VR_mu->GetBinContent( backgroundEstimationFunctionFitStatUp_VR_mu->FindBin(st_for_findbin) );
+    transfer_weight_fitstatDown_SR_ele = backgroundEstimationFunctionFitStatDown_SR_ele->GetBinContent( backgroundEstimationFunctionFitStatDown_SR_ele->FindBin(st_for_findbin) );
+    transfer_weight_fitstatDown_SR_mu = backgroundEstimationFunctionFitStatDown_SR_mu->GetBinContent( backgroundEstimationFunctionFitStatDown_SR_mu->FindBin(st_for_findbin) );
+    transfer_weight_fitstatDown_VR_ele = backgroundEstimationFunctionFitStatDown_VR_ele->GetBinContent( backgroundEstimationFunctionFitStatDown_VR_ele->FindBin(st_for_findbin) );
+    transfer_weight_fitstatDown_VR_mu = backgroundEstimationFunctionFitStatDown_VR_mu->GetBinContent( backgroundEstimationFunctionFitStatDown_VR_mu->FindBin(st_for_findbin) );
 
     if(debug) cout << "Gotten all values" << endl;
     
@@ -697,6 +869,35 @@ bool TstarTstarDNNModule::process(Event & event) {
     else h_ValidationRegion_datadriven_BtagDown_ele->fill(event);
     event.weight = weight_for_resetting;
 
+    // fitstat variation
+    if(event.get(h_flag_muonevent)) event.weight *= transfer_weight_fitstatUp_SR_mu * purity_value_mu;
+    else event.weight *= transfer_weight_fitstatUp_SR_ele * purity_value_ele;
+    h_SignalRegion_datadriven_fitstatUp_total->fill(event);
+    if(event.get(h_flag_muonevent)) h_SignalRegion_datadriven_fitstatUp_mu->fill(event);
+    else h_SignalRegion_datadriven_fitstatUp_ele->fill(event);
+    event.weight = weight_for_resetting;
+
+    if(event.get(h_flag_muonevent)) event.weight *= transfer_weight_fitstatDown_SR_mu * purity_value_mu;
+    else event.weight *= transfer_weight_fitstatDown_SR_ele * purity_value_ele;
+    h_SignalRegion_datadriven_fitstatDown_total->fill(event);
+    if(event.get(h_flag_muonevent)) h_SignalRegion_datadriven_fitstatDown_mu->fill(event);
+    else h_SignalRegion_datadriven_fitstatDown_ele->fill(event);
+    event.weight = weight_for_resetting;
+
+    if(event.get(h_flag_muonevent)) event.weight *= transfer_weight_fitstatUp_VR_mu * purity_value_mu;
+    else event.weight *= transfer_weight_fitstatUp_VR_ele * purity_value_ele;
+    h_ValidationRegion_datadriven_fitstatUp_total->fill(event);
+    if(event.get(h_flag_muonevent)) h_ValidationRegion_datadriven_fitstatUp_mu->fill(event);
+    else h_ValidationRegion_datadriven_fitstatUp_ele->fill(event);
+    event.weight = weight_for_resetting;
+
+    if(event.get(h_flag_muonevent)) event.weight *= transfer_weight_fitstatDown_VR_mu * purity_value_mu;
+    else event.weight *= transfer_weight_fitstatDown_VR_ele * purity_value_ele;
+    h_ValidationRegion_datadriven_fitstatDown_total->fill(event);
+    if(event.get(h_flag_muonevent)) h_ValidationRegion_datadriven_fitstatDown_mu->fill(event);
+    else h_ValidationRegion_datadriven_fitstatDown_ele->fill(event);
+    event.weight = weight_for_resetting;
+
   } // else fill them normally here -> to double check, at least for VR! TODO
 
   
@@ -742,19 +943,29 @@ bool TstarTstarDNNModule::process(Event & event) {
         if(event.get(h_flag_muonevent)) event.weight *= transfer_weight_nominal_SR_mu * purity_value_mu;
         else event.weight *= transfer_weight_nominal_SR_ele * purity_value_ele;
       }
-      if(is_MC /* blinding */ || is_datadriven_BG_run) {
-        h_hists_SR->fill(event);
-        h_SignalRegion_total->fill(event);
-        if(event.get(h_flag_muonevent)) {
-          h_hists_SR_mu->fill(event);
-          h_SignalRegion_mu->fill(event);
-        }
-        else {
-          h_hists_SR_ele->fill(event);
-          h_SignalRegion_ele->fill(event);
-        }
+      // now unblinded here
+      h_hists_SR->fill(event);
+      h_SignalRegion_total->fill(event);
+      if(event.get(h_flag_muonevent)) {
+        h_hists_SR_mu->fill(event);
+        h_SignalRegion_mu->fill(event);
+      }
+      else {
+        h_hists_SR_ele->fill(event);
+        h_SignalRegion_ele->fill(event);        
       }
       if (is_datadriven_BG_run) event.weight = weight_for_resetting; // resetting the weight
+
+      // outputting event information for eventdisplay
+      // idea is to do this for muon events in the SR with high S_T
+      if(
+          (event.get(h_flag_muonevent) && !is_MC && event.get(h_ST_HOTVR) > 3500) ||
+          (event.get(h_flag_muonevent) && !is_MC && event.get(h_ST_HOTVR) > 2000 && event.get(h_DNN_output) > 0.9) 
+        ) {
+        // creating output here
+        std::cout << event.run << ":" << event.luminosityBlock << ":" << event.event << std::endl;
+      }
+
     }
     if(fillVR) {
       if (is_datadriven_BG_run) {
@@ -838,7 +1049,7 @@ bool TstarTstarDNNModule::process(Event & event) {
         // tighter b-tag selection
         BTag bJetID_medium = BTag(BTag::algo::DEEPJET, BTag::wp::WP_MEDIUM);
         int N_btag_medium = 0;
-        for (const auto & jet: *event.jets){
+        for (const auto & jet: event.get(h_CHS_matched)){
           if(bJetID_medium(jet, event)) N_btag_medium++;
         }
 

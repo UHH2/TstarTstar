@@ -26,6 +26,8 @@ public:
 
     bool is_MC;
 
+    uhh2::Event::Handle< std::vector<Jet> > h_CHS_matched;
+
     TopJetId topjetID;
     uhh2::Event::Handle<FlavorParticle> h_primlep;
     uhh2::Event::Handle<double> h_ST_AK4;

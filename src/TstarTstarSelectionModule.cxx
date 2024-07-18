@@ -32,6 +32,8 @@
 #include "UHH2/TstarTstar/include/ElecTriggerSF.h"
 #include "UHH2/TstarTstar/include/TstarTstarJetCorrectionHists.h"
 #include "UHH2/TstarTstar/include/JetMETCorrections.h"
+#include <UHH2/TstarTstar/include/CHSJetCorrections.h>
+#include "UHH2/TstarTstar/include/PuppiCHSMatching.h"
 
 // HOTVR stuff
 #include "UHH2/HOTVR/include/HOTVRIds.h"
@@ -67,6 +69,10 @@ private:
   std::unique_ptr<AnalysisModule> AK4cleaner;
   std::unique_ptr<AnalysisModule> reco_primlep;
   std::unique_ptr<AnalysisModule> ttgenprod;
+
+  // CHS jet related
+  std::unique_ptr<CHSJetCorrections> CHSjetCorr;
+  std::unique_ptr<AnalysisModule> PuppiCHSMatcher;
 
   // HOTVR-related
   std::unique_ptr<AnalysisModule> HOTVRCorr;
@@ -155,7 +161,7 @@ private:
   uhh2::Event::Handle<bool> h_is_ttbarCR;
   uhh2::Event::Handle<bool> h_MC_isfake2017B;
   uhh2::Event::Handle<bool> h_MC_isfake2016B;
-
+  uhh2::Event::Handle<vector<Jet>> h_CHS_matched;
 
   // ###### other needed definitions ######
   bool debug = false;
@@ -245,6 +251,11 @@ TstarTstarSelectionModule::TstarTstarSelectionModule(Context & ctx) {
   HOTVRCorr.reset(new HOTVRJetCorrectionModule(ctx));
   HOTVRcleaner.reset(new TopJetCleaner(ctx, AndId<Jet>(PtEtaCut(200, 2.5), JetPFID(JetPFID::WP_TIGHT_PUPPI)) ));
 
+  // CHS jet stuff (for matching)
+  CHSjetCorr.reset(new CHSJetCorrections());
+  CHSjetCorr->init(ctx);
+  PuppiCHSMatcher.reset(new PuppiCHSMatching(ctx, "jetsAk4CHS"));
+
   // primary lepton
   reco_primlep.reset(new PrimaryLepton(ctx));
 
@@ -271,7 +282,7 @@ TstarTstarSelectionModule::TstarTstarSelectionModule(Context & ctx) {
 
   // b-tagging scale factors
   if(debug) cout << "Setting up btagging scale." << endl;
-  ScaleFactor_btagging.reset(new MCBTagDiscriminantReweighting(ctx, BTag::algo::DEEPJET)); // should be enough like this
+  ScaleFactor_btagging.reset(new MCBTagDiscriminantReweighting(ctx, BTag::algo::DEEPJET, "CHS_matched")); // SFs on the matched CHS jets 
   if(is_MC) { // TODO put this into a module at some point
     TFile *f = new TFile("/nfs/dust/cms/user/flabe/TstarTstar/ULegacy/CMSSW_10_6_28/src/UHH2/TstarTstar/macros/rootmakros/files/btagYieldSFs_"+year+".root");
     TString sample_string = "";
@@ -283,7 +294,6 @@ TstarTstarSelectionModule::TstarTstarSelectionModule(Context & ctx) {
     else if(ctx.get("dataset_version").find("DY") != std::string::npos) sample_string = "DYJets";
     else if(ctx.get("dataset_version").find("TstarTstarToTgammaTgamma") != std::string::npos) sample_string = "TstarTstar";
     else if(ctx.get("dataset_version").find("TstarTstarToTgluonTgluon_Spin32") != std::string::npos) sample_string = "TstarTstar_Spin32";
-    // TODO add new signal samples here!
     if(debug) std::cout << "Apply 2D b-taggin yield SFs for " << sample_string << std::endl;
 
     if(sample_string != "") eventYieldFactors = (TH2D*)f->Get(sample_string);
@@ -510,6 +520,10 @@ TstarTstarSelectionModule::TstarTstarSelectionModule(Context & ctx) {
   h_is_btagevent = ctx.declare_event_output<bool>("is_btagevent");
   h_is_ttbarCR = ctx.declare_event_output<bool>("is_ttbarCR");
 
+  h_CHS_matched = ctx.get_handle<vector<Jet>>("CHS_matched");
+  
+  // undeclaring AK4 CHS jets, just to make sure we don't blow up the memory too much
+  ctx.undeclare_event_output("jetsAk4CHS");
 }
 
 
@@ -580,6 +594,8 @@ bool TstarTstarSelectionModule::process(Event & event) {
   if(!jetcorrections->process(event)) return false;
   if(!(HOTVRjlc->process(event))) return false;
   if(!(HOTVRCorr->process(event))) return false;
+  if(!(CHSjetCorr->process(event))) return false;
+  PuppiCHSMatcher->process(event); // this will define the CHS matched collection we need for b-tagging!
 
   // hists after jet corrections
   if(debug) std::cout << "Fill correction hists" << endl;
@@ -839,7 +855,7 @@ bool TstarTstarSelectionModule::process(Event & event) {
   }
   BTag bJetID_loose = BTag(BTag::algo::DEEPJET, BTag::wp::WP_LOOSE);
   int N_btag_loose = 0;
-  for (const auto & jet: *event.jets){
+  for(const auto & jet : event.get(h_CHS_matched)) {
     if(bJetID_loose(jet, event)) N_btag_loose++;
   }
   if(passHOTVRtoptag && N_btag_loose > 1) event.set(h_is_ttbarCR, true);
@@ -864,7 +880,7 @@ bool TstarTstarSelectionModule::process(Event & event) {
   // btag selection
   BTag bJetID = BTag(BTag::algo::DEEPJET, BTag::wp::WP_MEDIUM);
   bool pass_btagcut = false;
-  for (const auto & jet: *event.jets){
+  for (const auto & jet : event.get(h_CHS_matched)) {
     if(bJetID(jet, event)) pass_btagcut = true;
   }
   event.set(h_is_btagevent, pass_btagcut); // not throwing events away, as we'll keep these for iur

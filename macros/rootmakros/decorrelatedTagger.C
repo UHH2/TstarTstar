@@ -9,6 +9,10 @@ Double_t meanFunc(Double_t *x, Double_t *par) {
   return ( fit1->EvalPar(x,par) + fit2->EvalPar(x,par) ) / 2;
 }
 
+Double_t CrystalBall(Double_t *x, Double_t *par) {
+  return ROOT::Math::crystalball_function(x[0], par[0], par[1], par[2], par[3]);
+}
+
 void decorrelatedTagger(){
 
   Double_t efficiency_ttbar = 0.3;
@@ -19,6 +23,7 @@ void decorrelatedTagger(){
   gStyle->SetOptStat(0);
   gStyle->SetTitleSize(0.06,"x");
   gStyle->SetTitleSize(0.06,"y");
+  gStyle->SetTitleSize(0.06,"z");
   gStyle->SetLabelSize(0.05,"x");
   gStyle->SetLabelSize(0.05,"y");
   gStyle->SetLabelSize(0.05,"z");
@@ -29,7 +34,10 @@ void decorrelatedTagger(){
   gStyle->SetPadTopMargin(0.05);
   gStyle->SetPadBottomMargin(0.13);
   gStyle->SetPadLeftMargin(0.18);
-  gStyle->SetPadRightMargin(0.17);
+  gStyle->SetPadRightMargin(0.2);
+
+  // recommended color style
+  gStyle->SetPalette(112); // viridis
 
   gROOT->ForceStyle();
   Double_t w = 600;
@@ -49,7 +57,7 @@ void decorrelatedTagger(){
   TH2D *hist = (TH2D*)input->Get(subpath+"/"+histname);
   if(!hist) cout << "Empty hist" << endl;
 
-  bool store_functions = true;
+  bool store_functions = false;
 
   // flip
   TH2D *hist2 = new TH2D("oldrebin",hist->GetTitle(), 40, 0, 4000, 50, 0, 1);
@@ -117,57 +125,73 @@ void decorrelatedTagger(){
   }
 
   // draw plot
-  hist->GetXaxis()->SetTitle("S_{T} [GeV]");
-  hist->GetXaxis()->SetNdivisions(505);
-  hist->GetYaxis()->SetTitle("1 - DNN output");
-  hist->SetTitle("");
+  gPad->SetTickx(1);
+  gPad->SetTicky(1);
+  
+  TH1* frame = gPad->DrawFrame(500, 0, 4000, 1.3);
+  frame->GetXaxis()->SetTitle("S_{T} [GeV]");
+  frame->GetYaxis()->SetTitle("1 #minus s_{DNN}");
+  frame->GetXaxis()->SetNdivisions(505);
 
-  hist->Draw("colz");
+  hist->SetTitle("");
+  hist->GetZaxis()->SetTitle("Events / bin");
+  hist->GetZaxis()->SetTitleOffset(1.15);
+  hist->GetZaxis()->SetRangeUser(0.1, 1e4);
+
+  hist->Draw("colz same");
 
   // draw Lumi text
   TString infotext = TString::Format("%3.0f fb^{-1} (%d TeV)", 137.6, 13);
   TLatex *text = new TLatex(3.5, 24, infotext);
   text->SetNDC();
   text->SetTextAlign(33);
-  text->SetX(0.88);
+  text->SetX(0.85);
   text->SetTextFont(42);
-  text->SetY(1);
-  text->SetTextSize(0.045);
+  text->SetY(0.9872);
+  text->SetTextSize(0.035);
   text->Draw();
 
+  double CMS_size = 0.06;
+  double ratio = 1.3;
   // draw CMS Work in Progress text
   TString cmstext = "CMS";
   TLatex *text2 = new TLatex(3.5, 24, cmstext);
   text2->SetNDC();
   text2->SetTextAlign(13);
-  text2->SetX(0.185);
+  text2->SetX(0.225);
   text2->SetTextFont(62);
-  text2->SetTextSize(0.05);
-  text2->SetY(1);
+  text2->SetTextSize(CMS_size);
+  text2->SetY(0.91);
   text2->Draw();
-  TString preltext = "Work in Progress";
+
+  TString preltext = "Simulation";
   TLatex *text3 = new TLatex(3.5, 24, preltext);
   text3->SetNDC();
   text3->SetTextAlign(13);
-  text3->SetX(0.29);
+  text3->SetX(0.225);
   text3->SetTextFont(52);
-  text3->SetTextSize(0.035);
-  text3->SetY(0.986);
+  text3->SetTextSize(CMS_size / ratio);
+  text3->SetY(0.85);
   text3->Draw();
 
   TGraph* edgePoints = new TGraphAsymmErrors(cutedgesX.size(),&cutedgesX[0],&cutedgesY[0], 0, 0, &errors[0], &errors[0]);
   edgePoints->SetMarkerStyle(1);
-  edgePoints->Draw("p same");
+  //edgePoints->Draw("p same");
   //other option: Gauß + exponential
-  fit1 = new TF1("fit1", "pol2", 500, 4000);
-  fit2 = new TF1("fit2", "[2] + [0] * exp([1] * x)", 500, 4000);
+  //fit1 = new TF1("fit1", "[2] + [0] * exp([1] * x)", 500, 4000);
+  fit1 = new TF1("fit1", "crystalball", 500, 4000);
+  //fit2 = new TF1("fit2", "[2] + [0] * exp([1] * x)", 500, 4000);
+  fit2 = new TF1("fit2", "crystalball", 500, 4000);
   // constant, mean, sigma, alpha, N
-  //fit->SetParameters(.9,270,200,-0.3,1e+06);
+  fit1->SetParameters(.8,700,400,-0.2,8e+05);
+  fit2->SetParameters(.8,700,400,-0.2,8e+05);
   //fit->SetParameters(2, -3.05300e-03, 4.17680e-01);
-  edgePoints->Fit("fit1", "N", "", 600, 4000);
-  edgePoints->Fit("fit2", "N", "", 600, 4000);
+  edgePoints->Fit("fit1", "N", "", 500, 4000);
+  edgePoints->Fit("fit2", "N", "", 500, 4000);
 
   fitMean = new TF1("mean", meanFunc, 0, 6000);
+
+  fitMean->SetLineWidth(3);
 
   fitMean->Draw("same");
 
@@ -183,6 +207,19 @@ void decorrelatedTagger(){
   otherfunc->SetLineColor(kBlue);
   otherfunc->Draw("L same");
   **/
+
+  // add legend
+  auto legend = new TLegend(0.52, 0.71, 0.77, 0.81);
+  gStyle->SetLegendTextSize(0.045);
+  TString fitlabelnumber = TString::Format("%.0f", efficiency_ttbar * 100);
+  legend->AddEntry(fitMean, "f(S_{T}, "+fitlabelnumber+"%)", "l");
+
+  legend->SetFillStyle(0);
+  legend->SetBorderSize(0);
+  legend->Draw();
+
+  gPad->RedrawAxis();
+
   c1_hist->SaveAs("plots/variableCuts_"+filename+"_"+subpath+"_"+histname+"_"+effic_string+".pdf");
 
   // saving fit function to output file

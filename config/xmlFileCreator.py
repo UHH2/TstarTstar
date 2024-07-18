@@ -101,9 +101,9 @@ class configContainer:
 
       # everything will be passed through until the end, so just put the new ones!
       self.additionalBranches = {
-         'Preselection': "",
-         'Selection': "trigger_decision trigger_decision_ele MC_isfake2017B MC_isfake2016B is_muevt evt_weight is_highpt weight_pu weight_pu_up weight_pu_down prefiringWeight prefiringWeightDown prefiringWeightUp",
-         'Analysis': "neutrino is_btagevent weight_sfmu_id weight_sfmu_id_down weight_sfmu_id_up weight_sfmu_iso weight_sfmu_iso_down weight_sfmu_iso_up weight_sfmu_trigger weight_sfmu_trigger_up weight_sfmu_trigger_down weight_sfelec_id weight_sfelec_id_down weight_sfelec_id_up weight_sfelec_reco weight_sfelec_reco_down weight_sfelec_reco_up weight_sfelec_trigger weight_sfelec_trigger_up weight_sfelec_trigger_down weight_btagdisc_central weight_btagdisc_lf_up weight_btagdisc_lf_down weight_btagdisc_hf_up weight_btagdisc_hf_down weight_btagdisc_hfstats1_up weight_btagdisc_hfstats1_down weight_btagdisc_hfstats2_up weight_btagdisc_hfstats2_down weight_btagdisc_lfstats1_up weight_btagdisc_lfstats1_down weight_btagdisc_lfstats2_up weight_btagdisc_lfstats2_down weight_btagdisc_cferr1_up weight_btagdisc_cferr1_down weight_btagdisc_cferr2_up weight_btagdisc_cferr2_down  ST_AK4 ST_HOTVR weight_murmuf_upup weight_murmuf_upnone weight_murmuf_noneup weight_murmuf_nonedown weight_murmuf_downnone weight_murmuf_downdown",
+         'Preselection': "jetsAk4CHS",
+         'Selection': "trigger_decision trigger_decision_ele MC_isfake2017B MC_isfake2016B is_muevt evt_weight is_highpt weight_pu weight_pu_up weight_pu_down prefiringWeight prefiringWeightDown prefiringWeightUp weight_murmuf_upup weight_murmuf_upnone weight_murmuf_noneup weight_murmuf_nonedown weight_murmuf_downnone weight_murmuf_downdown",
+         'Analysis': "CHS_matched neutrino is_btagevent weight_sfmu_id weight_sfmu_id_down weight_sfmu_id_up weight_sfmu_iso weight_sfmu_iso_down weight_sfmu_iso_up weight_sfmu_trigger weight_sfmu_trigger_up weight_sfmu_trigger_down weight_sfelec_id weight_sfelec_id_down weight_sfelec_id_up weight_sfelec_reco weight_sfelec_reco_down weight_sfelec_reco_up weight_sfelec_trigger weight_sfelec_trigger_up weight_sfelec_trigger_down weight_btagdisc_central weight_btagdisc_lf_up weight_btagdisc_lf_down weight_btagdisc_hf_up weight_btagdisc_hf_down weight_btagdisc_hfstats1_up weight_btagdisc_hfstats1_down weight_btagdisc_hfstats2_up weight_btagdisc_hfstats2_down weight_btagdisc_lfstats1_up weight_btagdisc_lfstats1_down weight_btagdisc_lfstats2_up weight_btagdisc_lfstats2_down weight_btagdisc_cferr1_up weight_btagdisc_cferr1_down weight_btagdisc_cferr2_up weight_btagdisc_cferr2_down  ST_AK4 ST_HOTVR",
          'DNN': "ST_weight DNN_Inputs TstarTstar_Hyp_gHOTVR TstarTstar_Hyp_gAK4",
          'DNN_datadriven': "",
       }
@@ -270,7 +270,7 @@ class xmlCreator:
          file.write(''']>\n''')
          file.write('''\n''')
          file.write('''<!--\n''')
-         file.write('''<ConfigParse NEventsBreak="'''+('500000' if not (self.step == "Preselection") else '0')+'''" FileSplit="'''+('0' if not (self.step == "Preselection") else self.yearVars['preselFileSplit'][self.year])+'''" AutoResubmit="5"/>\n''')
+         file.write('''<ConfigParse NEventsBreak="'''+('250000' if not (self.step == "Preselection") else '0')+'''" FileSplit="'''+('0' if not (self.step == "Preselection") else self.yearVars['preselFileSplit'][self.year])+'''" AutoResubmit="5"/>\n''')
          file.write('''<ConfigSGE RAM="4" DISK="3" Mail="'''+self.userMail+'''" Notification="as" Workdir="'''+self.workdirName+'''"/>\n''')
          file.write('''-->\n''')
          file.write('''\n''')
@@ -318,10 +318,9 @@ class xmlCreator:
          file.write('''\n''')
          file.write('''<Item Name="jersmear_direction" Value="'''+ self.jersmear_direction+'''"/>\n''')
          file.write('''<Item Name="jecsmear_direction" Value="'''+ self.jecsmear_direction+'''"/>\n''')
-         if (self.step == "Preselection"):
-             file.write('''<Item Name="ScaleVariationMuR" Value = "central" />''')
-             file.write('''<Item Name="ScaleVariationMuF" Value = "central" />''')
-         elif(self.step == "Selection"):
+         file.write('''<Item Name="ScaleVariationMuR" Value = "central" />''')
+         file.write('''<Item Name="ScaleVariationMuF" Value = "central" />''')
+         if(self.step == "Selection"):
              file.write('''<!-- scale factor configuration -->\n''')
              file.write('''<Item Name="HOTVRTopTagSFs" Value="'''+self.yearVars['HOTVRSFs'][self.year]+'''"/>\n''')
              file.write('''<Item Name="SF_path" Value="/nfs/dust/cms/user/flabe/TstarTstar/CMSSW_10_2_17/src/UHH2/TstarTstar/factors/" />\n''')

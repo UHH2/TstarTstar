@@ -281,9 +281,9 @@ bool TstarTstarAnalysisModule::process(Event & event) {
     // output the valuea
     if(debug) cout << "Write inputs" << endl;
     DNN_InputWriter->process(event);
-    if(debug) cout << "plot inputs" << endl;
 
     // make some control plots
+    if(debug) cout << "plot inputs" << endl;
     if(event.get(h_is_btagevent) && event.get(h_trigger_decision)) h_DNN_Inputs->fill(event);
   }
 
